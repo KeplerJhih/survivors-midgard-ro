@@ -16,7 +16,7 @@ const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 export interface BotState {
   running: boolean;
   /** patrol：一般走位；portal：正在走向返回地圖傳送門 */
-  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'screen';
+  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'flee' | 'screen';
   /** 最近讀到的 HP 比例（-1 表示讀不到） */
   hp: number;
   dodges: number;
@@ -47,6 +47,8 @@ export interface BotDeps {
   findIndicators?: () => Indicator[] | null;
   /** 探測角色周圍的紅色預警框；沒提供時不躲 */
   probeDanger?: () => DangerProbes | null;
+  /** 催眠師螺旋太近時回傳遠離方向 */
+  fleeSwirl?: () => Dir[] | null;
   /** 讀 HP 條；沒提供時不做低血量行為 */
   readHp?: () => HpReading | null;
   pointer?: Pointer;
@@ -71,7 +73,7 @@ const RETREAT_PERIOD_FACTOR = 2.5;
  */
 export function createBot(
   cfg: BotConfig,
-  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, readHp, pointer, log }: BotDeps,
+  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, fleeSwirl, readHp, pointer, log }: BotDeps,
 ): Bot {
   let config = cfg;
   let strategy: Strategy = createStrategy(cfg.mode, cfg);
@@ -177,6 +179,13 @@ export function createBot(
       state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : lowHp ? 'retreat' : 'patrol';
       const patrol = lowHp ? retreat(t - startedAt) : strategy(t - startedAt);
       let want = portalDirs ?? targetDirs ?? patrol;
+      if (!portalDirs && fleeSwirl && config.seekTargets) {
+        const away = fleeSwirl();
+        if (away) {
+          state.activity = 'flee';
+          want = away;
+        }
+      }
       if (config.dodge && probeDanger) {
         if (t - lastDangerProbe >= DANGER_INTERVAL_MS) {
           lastDangerProbe = t;

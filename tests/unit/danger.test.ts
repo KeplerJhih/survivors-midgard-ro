@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dodge, isDanger, probeDanger, type DangerProbes } from '@/core/vision/danger';
+import { dodge, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
 import type { Frame } from '@/core/vision/frame';
 
 const W = 160;
@@ -53,5 +53,24 @@ describe('dodge', () => {
   it('站著不動時，只有腳下是紅的才動', () => {
     expect(dodge(probes(0, [0.9, 0, 0, 0, 0, 0, 0, 0]), [])).toBeNull();
     expect(dodge(probes(0.5, [0.9, 0.9, 0, 0.9, 0.9, 0.9, 0.9, 0.9]), [])).toEqual(['up']);
+  });
+});
+
+describe('fleeSwirl', () => {
+  const SWIRL = [248, 181, 245]; // 實機催眠師螺旋
+  it('顏色：螺旋是、粉紅光效與波利不是', () => {
+    expect(isHypnoSwirl(255, 189, 255)).toBe(true);
+    expect(isHypnoSwirl(250, 180, 170)).toBe(false);
+    expect(isHypnoSwirl(250, 150, 160)).toBe(false);
+  });
+
+  it('螺旋在角色右上方附近 → 往左下逃', () => {
+    const f = frame((x, y) => (Math.hypot(x - (W / 2 + 15), y - (H / 2 - 10)) < 5 ? SWIRL : null));
+    expect(fleeSwirl(f)).toEqual(['left', 'down']);
+  });
+
+  it('螺旋很遠時不理', () => {
+    const f = frame((x, y) => (Math.hypot(x - 5, y - 5) < 4 ? SWIRL : null));
+    expect(fleeSwirl(f)).toBeNull();
   });
 });

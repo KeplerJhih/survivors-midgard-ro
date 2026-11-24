@@ -1,5 +1,5 @@
 import { dirsFromAngle, type Dir } from '../movement/directions';
-import type { Frame } from './frame';
+import { findBlob, type Frame } from './frame';
 
 /**
  * 地面紅色預警框（MVP 技能，例如 Baphomet「Niflheim 斬擊：站到裂痕之間！」的紅色帶狀區域）。
@@ -75,4 +75,23 @@ export function dodge(p: DangerProbes, want: Dir[], threshold = 0.15): Dir[] | n
   if (safe.length === 0) return dirsFromAngle(pick(all) * SECTOR_ANGLE);
   const best = safe.reduce((b, k) => (closeness(k) < closeness(b) ? k : b));
   return dirsFromAngle(best * SECTOR_ANGLE);
+}
+
+/**
+ * 催眠師的地面紫色螺旋（站在半徑 1.8 內 2 秒會跳「忘掉一個技能」，core/altars.gd）。
+ * 進入畫面後指示器消失，需另外辨識。實機取樣（2026-11-25）：(248,181,245)、(241,166,245)、(255,189,255)。
+ */
+export const isHypnoSwirl = (r: number, g: number, b: number) =>
+  r >= 225 && b >= 230 && g >= 150 && g <= 200 && r - g >= 45 && b - g >= 45;
+
+/** 螺旋太靠近角色（重心距離 < near×H）時，回傳遠離它的方向；否則 null */
+export function fleeSwirl(f: Frame, near = 0.25): Dir[] | null {
+  const blob = findBlob(f, isHypnoSwirl, 12);
+  if (!blob) return null;
+  // findBlob 以寬度正規化；換成以高度正規化
+  const k = f.width / f.height;
+  const x = blob.x * k;
+  const y = blob.y * k;
+  if (Math.hypot(x, y) >= near) return null;
+  return dirsFromAngle(Math.atan2(y, -x)); // 反方向（畫面 y 向下 → 角度 y 取正即為遠離）
 }

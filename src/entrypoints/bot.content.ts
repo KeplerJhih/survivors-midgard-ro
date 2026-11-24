@@ -11,7 +11,7 @@ import { createCanvasSampler } from '@/core/vision/frame';
 import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
 import { findIndicators } from '@/core/vision/indicators';
-import { probeDanger } from '@/core/vision/danger';
+import { fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { readHp } from '@/core/vision/hud';
 
 const TICK_MS = 50;
@@ -56,6 +56,10 @@ export default defineContentScript({
       probeDanger: () => {
         const frame = sample();
         return frame ? probeDanger(frame) : null;
+      },
+      fleeSwirl: () => {
+        const frame = sample();
+        return frame ? fleeSwirl(frame) : null;
       },
       readHp: () => {
         const frame = sampleHi();
