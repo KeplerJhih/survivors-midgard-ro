@@ -1,4 +1,4 @@
-import { GAME_MATCHES, isBridgeMessage, type BridgeMessage } from '@/core/messages';
+import { GAME_MATCHES, isBridgeMessage, RELOAD_MESSAGE, type BridgeMessage } from '@/core/messages';
 import type { Settings } from '@/core/settings';
 import { loadSettings, watchSettings } from '@/utils/settings-store';
 
@@ -13,6 +13,7 @@ export default defineContentScript({
     window.addEventListener('message', (e) => {
       if (e.source !== window || !isBridgeMessage(e.data)) return;
       if (e.data.type === 'request-settings') loadSettings().then(post);
+      if (e.data.type === 'reload-extension') browser.runtime.sendMessage({ type: RELOAD_MESSAGE }).catch(() => {});
     });
     loadSettings().then(post);
     watchSettings(post);

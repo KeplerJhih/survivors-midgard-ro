@@ -126,6 +126,11 @@ export default defineContentScript({
       get settings() {
         return settings;
       },
+      /** DevTools：__msbot.reloadExtension() → 載入最新 build 並重新注入（不刷新遊戲） */
+      reloadExtension() {
+        const msg: BridgeMessage = { __msbot: true, type: 'reload-extension' };
+        window.postMessage(msg, location.origin);
+      },
       dispose() {
         ticker.stop();
         clearTimeout(requestTimer);

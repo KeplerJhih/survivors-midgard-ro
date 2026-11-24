@@ -63,6 +63,7 @@ tests/unit/          單元測試
 
 - popup 勾「Debug 面板與 log」：遊戲左下角顯示狀態，console 以 `[MSBot]` 過濾
 - DevTools console：`__msbot.bot.state`、`__msbot.settings`、`__msKeepAlive.pendingCount()`
+- `__msbot.reloadExtension()`：從遊戲頁載入最新 build 並重新注入（不刷新遊戲），等同 popup 的重新載入按鈕
 
 ## 注意
 
