@@ -138,6 +138,9 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     .filter((b) =>
       panels.some((p) => rw(p) * rh(p) >= 0.05 && rw(p) > rw(b) && b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02 && cy(b) > cy(p) && cy(b) <= p.y1 + 0.05),
     )
+    // 下方還有「獨自一排」的按鈕時，那顆才是動作按鈕（實機：任務完成視窗把寬的獎勵列當成按鈕一直點，
+    // 真正的「繼續」是右下小按鈕）；暫停選單「繼續」下方是 4 顆一排的選單，不受影響
+    .filter((b) => !buttonRows.some((g) => g.length === 1 && g[0] !== b && cy(g[0]!) > cy(b) + 0.03 && cy(g[0]!) - cy(b) < 0.3))
     .sort((a, b) => cy(b) - cy(a))[0];
   if (wide) return tap('modal', wide);
   // 最下排明顯最寬的按鈕（準備「出發冒險！」等）；全寬面板（結算頁）不適用

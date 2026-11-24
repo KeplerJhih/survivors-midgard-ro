@@ -156,6 +156,17 @@ describe('decideByLayout（結構判斷）', () => {
     expect(decide(f)).toBeNull();
   });
 
+  it('任務完成視窗：寬的獎勵列不是按鈕，點右下的小「繼續」', () => {
+    const f = draw(GRASS, [
+      { x0: 0.2, y0: 0.27, x1: 0.8, y1: 0.8, fill: PANEL },
+      { x0: 0.21, y0: 0.56, x1: 0.79, y1: 0.64, fill: BTN }, // 獎勵列
+      { x0: 0.75, y0: 0.755, x1: 0.795, y1: 0.795, fill: BTN }, // 繼續
+    ]);
+    const a = decide(f)!;
+    expect(a.x).toBeGreaterThan(0.74);
+    expect(a.y).toBeGreaterThan(0.74);
+  });
+
   it('首領戰：上方中央的血條面板不當成寬按鈕', () => {
     const f = draw(GRASS, [
       { x0: 0.34, y0: 0.0, x1: 0.66, y1: 0.12, fill: PANEL },
