@@ -39,6 +39,22 @@ describe('detectScreen', () => {
     expect(a.y).toBeCloseTo(0.95, 1);
   });
 
+  it('腐化寶箱：點右側 Valhalla 卡片底部的「選擇這條路」（不選 Hel）', () => {
+    const f = paint(GRASS, [
+      { x0: 0.1, y0: 0.12, x1: 0.9, y1: 0.88, rgb: [242, 243, 246] }, // 視窗面板
+      { x0: 0.18, y0: 0.47, x1: 0.49, y1: 0.85, rgb: [255, 249, 247] }, // Hel 卡身
+      { x0: 0.18, y0: 0.47, x1: 0.49, y1: 0.54, rgb: [247, 224, 224] }, // Hel 標題（實機）
+      { x0: 0.51, y0: 0.47, x1: 0.82, y1: 0.85, rgb: [246, 249, 255] }, // Valhalla 卡身
+      { x0: 0.51, y0: 0.47, x1: 0.82, y1: 0.54, rgb: [222, 235, 255] }, // Valhalla 標題（實機）
+    ]);
+    const a = detectScreen(f)!;
+    expect(a.kind).toBe('corrupt');
+    expect(a.x).toBeGreaterThan(0.6);
+    expect(a.x).toBeLessThan(0.72);
+    expect(a.y).toBeGreaterThan(0.75);
+    expect(a.y).toBeLessThan(0.88);
+  });
+
   it('新卡片等置中視窗（背景不壓暗）：點底部主要按鈕「繼續」', () => {
     const f = paint(GRASS, [
       { x0: 0.31, y0: 0.2, x1: 0.68, y1: 0.82, rgb: PANEL },

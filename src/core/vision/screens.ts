@@ -8,10 +8,12 @@ import type { Frame } from './frame';
  * - 「不存放就離開？」確認框：背景加 55% 遮罩變暗，中央亮色小視窗，按鈕靠右 [要再想想][仍要離開]
  *   （ui/menus.gd _end_leave）
  * - 初始技能：「上次選擇」卡片頂端是 LEGENDARY_COLOR (0.85,0.42,0.05) 色帶（ui/menus.gd show_start_skill）
+ * - 腐化寶箱選路線：左卡 Hel 標題粉紅 (247,224,224)、右卡 Valhalla 標題淡藍 (222,235,255)，
+ *   按鈕「選擇這條路」在卡片底部；預設焦點在 Hel，所以只能點擊（karma.gd chest_choice、menus.gd）
  * - 「新卡片！」等置中視窗：淺色面板（實機約畫面 37%×61%，密度 0.72），底部「繼續」為主要按鈕（藍框，
  *   縮圖後只剩上緣一條線）；背景不壓暗。升級選卡視窗不使用 UiKit 主要按鈕，不會被誤點
  */
-export type ScreenKind = 'result' | 'modal' | 'dialog' | 'start-skill';
+export type ScreenKind = 'result' | 'corrupt' | 'modal' | 'dialog' | 'start-skill';
 
 export interface ScreenAction {
   kind: ScreenKind;
@@ -23,6 +25,10 @@ export interface ScreenAction {
 const isLight = (r: number, g: number, b: number) =>
   Math.min(r, g, b) >= 225 && Math.max(r, g, b) - Math.min(r, g, b) <= 30;
 const isPrimaryBorder = (r: number, g: number, b: number) => r <= 110 && b >= 180 && b - r >= 90 && g <= 135;
+const isHelHeader = (r: number, g: number, b: number) =>
+  r >= 238 && g >= 212 && g <= 234 && b >= 212 && b <= 234 && r - b >= 12;
+const isValhallaHeader = (r: number, g: number, b: number) =>
+  r >= 210 && r <= 234 && g >= 226 && g <= 244 && b >= 248 && b - r >= 20;
 const isLegendary = (r: number, g: number, b: number) => r >= 180 && g >= 70 && g <= 140 && b <= 60 && r - b >= 140;
 
 interface Box {
@@ -93,6 +99,19 @@ export function detectScreen(f: Frame): ScreenAction | null {
         y: (primary.minY + primary.maxY + 1) / 2 / H,
       };
     }
+  }
+
+  // 腐化寶箱：左 Hel（粉紅）右 Valhalla（淡藍）兩張卡 → 一律選 Valhalla（生存優先）
+  const hel = scan(f, isHelHeader, { x0: 0.05, x1: 0.95, y0: 0.15, y1: 0.75 });
+  const val = scan(f, isValhallaHeader, { x0: 0.05, x1: 0.95, y0: 0.15, y1: 0.75 });
+  const minHeader = W * H * 0.01;
+  if (hel.n >= minHeader && val.n >= minHeader && (hel.minX + hel.maxX) / 2 < (val.minX + val.maxX) / 2) {
+    const card = scan(f, isLight, { x0: val.minX / W, x1: (val.maxX + 1) / W, y0: val.minY / H, y1: 0.95 });
+    return {
+      kind: 'corrupt',
+      x: (val.minX + val.maxX + 1) / 2 / W,
+      y: (card.maxY + 1) / H - 0.04,
+    };
   }
 
   // 置中的淺色視窗，下半部有主要按鈕（新卡片「繼續」等）→ 點主要按鈕（藍框上緣往下一點才在按鈕內）
