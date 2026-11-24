@@ -111,7 +111,8 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   const wide = buttonRows
     .filter((g) => g.length === 1)
     .map((g) => g[0]!)
-    .filter((b) => rw(b) >= 0.2 && Math.abs(cx(b) - 0.5) < 0.1)
+    // 必須在畫面 30% 以下：實機誤判上方首領血條面板為寬按鈕，首領戰中停下亂點
+    .filter((b) => rw(b) >= 0.2 && Math.abs(cx(b) - 0.5) < 0.1 && cy(b) >= 0.3)
     .sort((a, b) => cy(b) - cy(a))[0];
   if (wide) return tap('modal', wide);
   // 最下排明顯最寬的按鈕
