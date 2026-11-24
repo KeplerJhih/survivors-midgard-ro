@@ -77,6 +77,23 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeCloseTo(0.595, 1);
   });
 
+  it('被壓暗背景上的置中對話框（按鈕切不出來）→ 點右下角', () => {
+    const f = draw([110, 112, 118], [{ x0: 0.366, y0: 0.513, x1: 0.634, y1: 0.592, fill: PANEL }]);
+    const a = decide(f)!;
+    expect(a.kind).toBe('dialog');
+    expect(a.x).toBeCloseTo(0.607, 1);
+    expect(a.y).toBeCloseTo(0.576, 1);
+  });
+
+  it('一般遊玩畫面（四角有亮 HUD）中央亮塊不當成對話框', () => {
+    const f = draw(GRASS, [
+      { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },
+      { x0: 0.86, y0: 0, x1: 1, y1: 0.27, fill: PANEL },
+      { x0: 0.4, y0: 0.45, x1: 0.6, y1: 0.55, fill: PANEL },
+    ]);
+    expect(decide(f)?.kind).not.toBe('dialog');
+  });
+
   it('暫停選單：先點置中寬按鈕「繼續」，絕不點最下排（含放棄本局）', () => {
     const f = draw(GRASS, [
       { x0: 0.24, y0: 0.2, x1: 0.76, y1: 0.8, fill: PANEL },

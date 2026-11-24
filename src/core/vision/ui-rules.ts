@@ -1,5 +1,5 @@
 import type { Frame } from './frame';
-import { cx, cy, inside, rh, rows, rw, type Region } from './layout';
+import { cx, cy, inside, lumaOf, rh, rows, rw, type Region } from './layout';
 import type { ScreenAction } from './screens';
 
 /**
@@ -111,6 +111,11 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     const p = container(bottom);
     if (p && rw(p) < 0.8) return tap('dialog', bottom[1]!);
   }
+  // 置中、獨立的亮區塊，且周圍被壓暗（遮罩）→ 對話框；按鈕一律靠右下（ALIGNMENT_END）→ 點右下角
+  // 實機：「不存放就離開？」的兩顆小按鈕邊框太淡切不出來，整個對話框被當成一塊
+  const dlg = dimmedDialog(f, regions);
+  if (dlg) return { kind: 'dialog', x: dlg.x0 + 0.9 * rw(dlg), y: dlg.y0 + 0.8 * rh(dlg) };
+
   // 置中單一寬按鈕（獨自一排）
   const wide = buttonRows
     .filter((g) => g.length === 1)
@@ -129,4 +134,34 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     if (rw(byWidth[0]!) >= 1.4 * rw(byWidth[1]!)) return tap('map-select', byWidth[0]!);
   }
   return null;
+}
+
+/**
+ * 畫面中央獨立的亮區塊，且背後加了遮罩：區塊外平均亮度比它低 60 以上，
+ * 且區塊外幾乎沒有亮像素（< 2%；一般遊玩畫面四角 HUD 面板是亮的、暫停選單/升級視窗本身也亮）
+ */
+function dimmedDialog(f: Frame, regions: Region[]): Region | null {
+  const cand = regions
+    .filter((r) => Math.abs(cx(r) - 0.5) < 0.12 && Math.abs(cy(r) - 0.5) < 0.15)
+    .filter((r) => rw(r) * rh(r) >= 0.01 && rw(r) * rh(r) <= 0.2 && rw(r) >= 0.15)
+    .sort((a, b) => rw(b) * rh(b) - rw(a) * rh(a))[0];
+  if (!cand) return null;
+  const L = lumaOf(f);
+  const W = f.width;
+  const H = f.height;
+  let sum = 0;
+  let n = 0;
+  let bright = 0;
+  for (let y = 0; y < H; y += 4) {
+    for (let x = 0; x < W; x += 4) {
+      const fx = x / W;
+      const fy = y / H;
+      if (fx >= cand.x0 - 0.05 && fx <= cand.x1 + 0.05 && fy >= cand.y0 - 0.1 && fy <= cand.y1 + 0.1) continue;
+      const v = L[y * W + x]!;
+      sum += v;
+      n++;
+      if (v >= 175) bright++;
+    }
+  }
+  return n && cand.luma - sum / n >= 60 && bright / n < 0.02 ? cand : null;
 }
