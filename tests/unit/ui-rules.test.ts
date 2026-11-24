@@ -66,6 +66,28 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeCloseTo(0.41, 1);
   });
 
+  it('結算：只有 3 顆按鈕（沒解鎖新地圖）→ 第 1 顆（再玩一次），不點最寬的「前往城鎮」', () => {
+    const f = draw(GRASS, [
+      { x0: 0.04, y0: 0.01, x1: 0.96, y1: 0.99, fill: PANEL },
+      { x0: 0.3, y0: 0.92, x1: 0.37, y1: 0.97, fill: BTN },
+      { x0: 0.38, y0: 0.92, x1: 0.62, y1: 0.97, fill: BTN },
+      { x0: 0.63, y0: 0.92, x1: 0.7, y1: 0.97, fill: BTN },
+    ]);
+    const a = decide(f)!;
+    expect(a.kind).toBe('result');
+    expect(a.x).toBeCloseTo(0.335, 1);
+  });
+
+  it('選地圖：右側直立面板右下角獨自的按鈕「選擇」', () => {
+    const f = draw([60, 70, 50], [
+      { x0: 0.625, y0: 0.17, x1: 0.986, y1: 0.855, fill: PANEL },
+      { x0: 0.873, y0: 0.8, x1: 0.975, y1: 0.845, fill: BTN },
+    ]);
+    const a = decide(f)!;
+    expect(a.kind).toBe('map-select');
+    expect(a.x).toBeCloseTo(0.92, 1);
+  });
+
   it('確認框：小面板底部 2 顆按鈕 → 最右', () => {
     const f = draw([40, 45, 30], [
       { x0: 0.36, y0: 0.45, x1: 0.64, y1: 0.6, fill: PANEL },

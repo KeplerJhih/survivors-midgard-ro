@@ -89,9 +89,11 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
 
   // ---- 按鈕列 ----
   const buttonRows = rows(buttons);
-  // 按鈕排所屬的面板：按鈕都在面板左右範圍內，且排位於面板內或緊貼其下方（≤ 8%）
+  // 按鈕排所屬的面板：按鈕都在面板左右範圍內，且排位於面板內或緊貼其下方（≤ 8%）。
+  // 容器也接受直立的 card（選地圖右側面板被歸為 card）
+  const containers = regions.filter((r) => r.kind === 'panel' || r.kind === 'card');
   const container = (row: Region[]) =>
-    panels
+    containers
       .filter(
         (p) =>
           row.every((b) => b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02) && cy(row[0]!) > p.y0 && cy(row[0]!) <= p.y1 + 0.08,
@@ -102,9 +104,12 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     .filter((g) => g.length >= 2 && container(g))
     .sort((a, b) => cy(b[0]!) - cy(a[0]!))[0];
 
-  if (bottom && bottom.length === 4) {
+  // 結算：近全寬面板最下排。4 顆 [選擇目的地][再玩一次][前往城鎮][更換職業] → 第 2 顆；
+  // 沒解鎖新地圖時沒有「選擇目的地」只剩 3 顆 [再玩一次][前往城鎮][更換職業] → 第 1 顆
+  // （實機：3 顆時落到「最寬按鈕」規則，點了字最多的「前往 Prontera · 可以轉生！」而進城鎮）
+  if (bottom && (bottom.length === 4 || bottom.length === 3)) {
     const p = container(bottom);
-    if (p && rw(p) >= 0.8) return tap('result', bottom[1]!);
+    if (p && rw(p) >= 0.8) return tap('result', bottom[bottom.length === 4 ? 1 : 0]!);
   }
   if (bottom && bottom.length === 2) {
     // 不限置中：任務 NPC 視窗在左側（[先不要][我來幫忙！]）
@@ -128,10 +133,31 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     )
     .sort((a, b) => cy(b) - cy(a))[0];
   if (wide) return tap('modal', wide);
-  // 最下排明顯最寬的按鈕
+  // 最下排明顯最寬的按鈕（準備「出發冒險！」等）；全寬面板（結算頁）不適用
   if (bottom) {
+    const p = container(bottom);
     const byWidth = [...bottom].sort((a, b) => rw(b) - rw(a));
-    if (rw(byWidth[0]!) >= 1.4 * rw(byWidth[1]!)) return tap('map-select', byWidth[0]!);
+    if ((!p || rw(p) < 0.8) && rw(byWidth[0]!) >= 1.4 * rw(byWidth[1]!)) return tap('map-select', byWidth[0]!);
+  }
+  // 大區塊右下角獨自一排的按鈕（選地圖「選擇 ▶」：返回/狂熱太小切不出來，只剩它）
+  const corner = cornerButton(regions, buttons);
+  if (corner) return tap('map-select', corner);
+  return null;
+}
+
+/** 大區塊（面板或直立卡片，面積 ≥ 15%）底部 25% 內、同排沒有其他按鈕、靠右半邊的最下方按鈕 */
+function cornerButton(regions: Region[], buttons: Region[]): Region | null {
+  const boxes = regions
+    .filter((r) => (r.kind === 'panel' || r.kind === 'card') && rw(r) * rh(r) >= 0.15 && rw(r) < 0.8)
+    .sort((a, b) => rw(b) * rh(b) - rw(a) * rh(a));
+  for (const box of boxes) {
+    const inBox = buttons.filter((b) => b.x0 >= box.x0 - 0.01 && b.x1 <= box.x1 + 0.01 && cy(b) > box.y0 && cy(b) <= box.y1 + 0.03);
+    const last = inBox.sort((a, b) => cy(b) - cy(a))[0];
+    if (!last) continue;
+    const alone = !inBox.some((b) => b !== last && Math.abs(cy(b) - cy(last)) < 0.02);
+    const nearBottom = cy(last) >= box.y1 - 0.25 * rh(box);
+    const rightSide = cx(last) >= cx(box);
+    if (alone && nearBottom && rightSide) return last;
   }
   return null;
 }
