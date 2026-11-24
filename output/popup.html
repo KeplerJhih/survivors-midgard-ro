@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Midgard Survivors Helper</title>
     <style>body{color:#1d2433;width:280px;margin:0;padding:12px;font:13px/1.5 system-ui,sans-serif}h1{margin:0 0 8px;font-size:14px}fieldset{border:1px solid #d5dae5;border-radius:6px;margin:0 0 10px;padding:6px 10px}legend{padding:0 4px;font-weight:600}label{align-items:center;gap:6px;margin:4px 0;display:flex}.hint{color:#6b7487;margin:2px 0 4px 22px;font-size:11px}.warn{color:#b3541e}select,input[type=number]{width:96px;margin-left:auto}#reload{width:100%;font:inherit;cursor:pointer;margin:4px 0 6px;padding:6px}#status{color:#2f7a3e;min-height:1.5em;font-size:11px}</style>
-    <script type="module" crossorigin src="/chunks/popup-CTAKKrIJ.js"></script>
+    <script type="module" crossorigin src="/chunks/popup-CcIJV6lv.js"></script>
   </head>
   <body>
     <h1>Midgard Survivors Helper</h1>
@@ -34,6 +34,10 @@
       <label>選卡間隔 (ms) <input type="number" min="500" step="100" data-key="bot.pickIntervalMs"></label>
       <label><input type="checkbox" data-key="bot.portalSeek"> MVP 後自動走回地圖</label>
       <div class="hint">畫面辨識「返回地圖」傳送門，避開紅色傳送門</div>
+      <label><input type="checkbox" data-key="bot.dodge"> 躲紅色預警框</label>
+      <div class="hint">辨識地面深紅色技能範圍（MVP 招式），往安全方向閃</div>
+      <label><input type="checkbox" data-key="bot.seekTargets"> 自動前往寶箱 / NPC</label>
+      <div class="hint">依畫面邊緣的指示器前往寶箱、任務 NPC、金波利；避開紫色催眠師</div>
       <label><input type="checkbox" data-key="bot.autoContinue"> 自動再玩一次</label>
       <div class="hint">畫面辨識：結算頁→再玩一次、確認框→仍要離開/繼續、初始技能→上次選擇</div>
       <label><input type="checkbox" data-key="bot.enterEnabled"> 自動按 Enter</label>

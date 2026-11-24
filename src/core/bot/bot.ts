@@ -6,13 +6,16 @@ import type { BotConfig } from '../settings';
 import type { Pointer } from '../input/pointer';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
+import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
+import { dodge, type DangerProbes } from '../vision/danger';
 
 const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 
 export interface BotState {
   running: boolean;
   /** patrol：一般走位；portal：正在走向返回地圖傳送門 */
-  activity: 'patrol' | 'portal' | 'screen';
+  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'screen';
+  dodges: number;
   /** 最近一次處理的畫面 */
   lastScreen: string;
   screenTaps: number;
@@ -37,12 +40,18 @@ export interface BotDeps {
   scanPortals?: () => PortalScan | null;
   /** 辨識需要點擊的畫面（結算、確認框、初始技能）；沒提供時不處理 */
   detectScreen?: () => ScreenAction | null;
+  /** 找畫面外指示器（寶箱、任務、金波利、催眠師）；沒提供時不前往 */
+  findIndicators?: () => Indicator[] | null;
+  /** 探測角色周圍的紅色預警框；沒提供時不躲 */
+  probeDanger?: () => DangerProbes | null;
   pointer?: Pointer;
   log?: Logger;
 }
 
 const SCAN_INTERVAL_MS = 250;
 const SCREEN_INTERVAL_MS = 500;
+const INDICATOR_INTERVAL_MS = 400;
+const DANGER_INTERVAL_MS = 150;
 
 /**
  * 掛機主迴圈：
@@ -53,7 +62,7 @@ const SCREEN_INTERVAL_MS = 500;
  */
 export function createBot(
   cfg: BotConfig,
-  { keyboard, now, scanPortals, detectScreen, pointer, log }: BotDeps,
+  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, pointer, log }: BotDeps,
 ): Bot {
   let config = cfg;
   let strategy: Strategy = createStrategy(cfg.mode, cfg);
@@ -64,12 +73,19 @@ export function createBot(
   let portalDirs: Dir[] | null = null;
   const seeker = createPortalSeeker();
   const screens = createScreenHandler();
+  const targetSeeker = createIndicatorSeeker();
+  let lastIndicatorScan = -Infinity;
+  let targetDirs: Dir[] | null = null;
+  let lastDangerProbe = -Infinity;
+  let probes: DangerProbes | null = null;
+  let dodging = false;
   let lastScreenCheck = -Infinity;
   let onScreen = false;
   const state: BotState = {
     running: false,
     activity: 'patrol',
     lastScreen: '-',
+    dodges: 0,
     screenTaps: 0,
     dirs: [],
     scans: 0,
@@ -129,8 +145,30 @@ export function createBot(
           portalDirs = next;
         }
       }
-      state.activity = portalDirs ? 'portal' : 'patrol';
-      const want = portalDirs ?? strategy(t - startedAt);
+      if (!portalDirs && config.seekTargets && findIndicators && t - lastIndicatorScan >= INDICATOR_INTERVAL_MS) {
+        lastIndicatorScan = t;
+        const next = targetSeeker.update(findIndicators(), t);
+        if (next && !targetDirs) log?.info('target: 前往指示器目標');
+        targetDirs = next;
+      }
+      if (portalDirs || !config.seekTargets) targetDirs = null;
+      state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : 'patrol';
+      let want = portalDirs ?? targetDirs ?? strategy(t - startedAt);
+      if (config.dodge && probeDanger) {
+        if (t - lastDangerProbe >= DANGER_INTERVAL_MS) {
+          lastDangerProbe = t;
+          probes = probeDanger();
+        }
+        const safer = probes ? dodge(probes, want) : null;
+        if (safer && !dodging) state.dodges++;
+        dodging = safer !== null;
+        if (safer) {
+          state.activity = 'dodge';
+          want = safer;
+        }
+      } else {
+        probes = null;
+      }
       for (const d of DIRS) {
         if (want.includes(d)) keyboard.down(d);
         else keyboard.up(d);

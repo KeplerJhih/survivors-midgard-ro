@@ -10,6 +10,8 @@ import { installMouseToTouch } from '@/core/touch/mouse-to-touch';
 import { createCanvasSampler } from '@/core/vision/frame';
 import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
+import { findIndicators } from '@/core/vision/indicators';
+import { probeDanger } from '@/core/vision/danger';
 
 const TICK_MS = 50;
 
@@ -33,6 +35,8 @@ export default defineContentScript({
     const log = createLogger(() => settings.debug);
     const keyboard = createKeyboard(canvas, { onSend: (type, name) => log.debug(type, name) });
     const sample = createCanvasSampler(canvas);
+    // 指示器圓盤較小，用較高解析度取樣
+    const sampleHi = createCanvasSampler(canvas, 320);
     const bot = createBot(settings.bot, {
       keyboard,
       now: () => performance.now(),
@@ -43,6 +47,14 @@ export default defineContentScript({
       detectScreen: () => {
         const frame = sample();
         return frame ? detectScreen(frame) : null;
+      },
+      findIndicators: () => {
+        const frame = sampleHi();
+        return frame ? findIndicators(frame) : null;
+      },
+      probeDanger: () => {
+        const frame = sample();
+        return frame ? probeDanger(frame) : null;
       },
       pointer: createPointer(canvas, () => /iPhone/.test(navigator.userAgent)),
       log,
@@ -94,6 +106,7 @@ export default defineContentScript({
         ticks: bot.state.ticks,
         scans: bot.state.scans,
         screen: `${bot.state.lastScreen} ×${bot.state.screenTaps}`,
+        dodges: bot.state.dodges,
         picks: bot.state.picks,
         enters: bot.state.enters,
         touch: removeTouch ? 'bridge' : '-',
