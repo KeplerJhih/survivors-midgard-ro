@@ -30,7 +30,7 @@ export interface FreezeDetector {
   readonly ticking: boolean;
 }
 
-/** 字形連續 freezeMs 不變 → 停住。必須先看過它走動（開局就停住不判定；讀不到就重置） */
+/** 字形連續 freezeMs 不變 → 停住。必須先看過它走動（開局就停住不判定）；偶爾讀不到（方框被遮）沿用上次狀態 */
 export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
   let last: Uint8Array | null = null;
   let lastOn = 0;
@@ -43,11 +43,7 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
     },
     update(glyph, now) {
       nowT = now;
-      if (!glyph) {
-        last = null;
-        ticked = false;
-        return false;
-      }
+      if (!glyph) return ticked && last !== null && now - changedAt >= freezeMs;
       let on = 0;
       for (let i = 0; i < glyph.length; i++) on += glyph[i]!;
       if (on < 10) {

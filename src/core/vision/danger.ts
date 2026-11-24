@@ -1,3 +1,4 @@
+import { HUD_ZONES } from './indicators';
 import { dirsFromAngle, type Dir } from '../movement/directions';
 import { findBlob, type Frame } from './frame';
 
@@ -101,7 +102,56 @@ export function fleeSwirl(f: Frame, near = 0.25): Dir[] | null {
 
 /** 走向粉紫光圈（時間停住＝MVP 入口開著時，光圈是傳送門而非催眠師） */
 export function approachSwirl(f: Frame): Dir[] | null {
-  const s = findSwirl(f);
+  const s = findSwirl(f) ?? findPortalGlow(f);
   if (!s) return null;
   return dirsFromAngle(Math.atan2(-s.y, s.x));
+}
+
+/**
+ * MVP 入口傳送門的光（顏色依 MVP 而異：Golden Thief Bug 是金色；core/mvp_raid.gd Vfx.warp_portal(color)）。
+ * 只在時間停住時用：此時遊戲會清掉一般怪物（banish_enemy），畫面上最大一團「高亮、高飽和」的光就是傳送門。
+ * 排除藍色系（角色周圍的藍色火焰）、角色中心、HUD 區域；取最大的連通塊，以畫面高度正規化。
+ */
+export function findPortalGlow(f: Frame, minPixels = 8): { x: number; y: number } | null {
+  const { width: W, height: H, data } = f;
+  const ok = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+      const mx = Math.max(r, g, b);
+      if (mx < 220 || mx - Math.min(r, g, b) < 90) continue;
+      if (b > r + 30 && b > g + 10) continue; // 藍色火焰
+      const fx = x / W, fy = y / H;
+      if (fy < 0.13) continue; // 頂部中央的首領/MVP 血條面板（粉紅血條）
+      if (HUD_ZONES.some((z) => fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1)) continue;
+      if (Math.hypot((x - W / 2) / H, (y - H / 2) / H) < 0.08) continue; // 角色本身
+      ok[y * W + x] = 1;
+    }
+  const seen = new Uint8Array(W * H);
+  let best: { n: number; x: number; y: number } | null = null;
+  const stack: number[] = [];
+  for (let p0 = 0; p0 < W * H; p0++) {
+    if (!ok[p0] || seen[p0]) continue;
+    seen[p0] = 1;
+    stack.push(p0);
+    let n = 0, sx = 0, sy = 0;
+    while (stack.length) {
+      const p = stack.pop()!;
+      const x = p % W, y = (p / W) | 0;
+      n++;
+      sx += x;
+      sy += y;
+      // 8 鄰接（光暈常是點狀散開）
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const q = ny * W + nx;
+          if (ok[q] && !seen[q]) (seen[q] = 1), stack.push(q);
+        }
+    }
+    if (n >= minPixels && (!best || n > best.n)) best = { n, x: sx / n, y: sy / n };
+  }
+  return best ? { x: (best.x - W / 2) / H, y: (best.y - H / 2) / H } : null;
 }

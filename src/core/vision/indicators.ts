@@ -29,7 +29,7 @@ export interface Indicator {
 export const LARGE_DISC = 0.044;
 
 /** 不在這些區域找（0~1）：左上資訊、右上小地圖與任務/傷害面板、底部技能列、兩側觸控搖桿與按鈕 */
-const HUD_ZONES = [
+export const HUD_ZONES = [
   { x0: 0, y0: 0, x1: 0.24, y1: 0.16 },
   { x0: 0.85, y0: 0, x1: 1, y1: 0.58 },
   { x0: 0.38, y0: 0.84, x1: 0.7, y1: 1 },

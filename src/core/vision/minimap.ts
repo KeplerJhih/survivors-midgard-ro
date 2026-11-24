@@ -50,9 +50,11 @@ export function findMinimapSquare(f: Frame): Square | null {
     }
     if (best >= 0.2 * W) lines.push({ y, x0: bx, len: best });
   }
+  // 邊框可能有 2 列（實機 273/274 交替被抓到 → 時鐘字形整列位移被當成變化）：每組相鄰線只取最上面那列
+  const firsts = lines.filter((l) => !lines.some((o) => o.y === l.y - 1 && Math.abs(o.x0 - l.x0) <= 3));
   let found: Square | null = null;
-  for (const a of lines)
-    for (const b of lines) {
+  for (const a of firsts)
+    for (const b of firsts) {
       if (b.y <= a.y + 10 || Math.abs(a.x0 - b.x0) > 3 || Math.abs(a.len - b.len) > 3) continue;
       const gap = b.y - a.y;
       if (Math.abs(gap - a.len) > a.len * 0.08) continue;

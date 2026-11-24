@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dodge, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
+import { dodge, findPortalGlow, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
 import type { Frame } from '@/core/vision/frame';
 
 const W = 160;
@@ -72,5 +72,33 @@ describe('fleeSwirl', () => {
   it('螺旋很遠時不理', () => {
     const f = frame((x, y) => (Math.hypot(x - 5, y - 5) < 4 ? SWIRL : null));
     expect(fleeSwirl(f)).toBeNull();
+  });
+});
+
+describe('findPortalGlow（時間停住時找 MVP 入口光）', () => {
+  const make = (blobs: { x: number; y: number; r: number; c: [number, number, number] }[]) => {
+    const W = 160;
+    const H = 110;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i++) data.set([90, 95, 105, 255], i * 4);
+    for (const b of blobs)
+      for (let y = b.y - b.r; y <= b.y + b.r; y++)
+        for (let x = b.x - b.r; x <= b.x + b.r; x++) data.set([...b.c, 255], (y * W + x) * 4);
+    return { width: W, height: H, data };
+  };
+  it('取最大的金色光團；藍色火焰、角色中心、頂部血條不算', () => {
+    const g = findPortalGlow(
+      make([
+        { x: 110, y: 75, r: 4, c: [255, 210, 60] }, // 金色傳送門
+        { x: 50, y: 60, r: 5, c: [60, 120, 255] }, // 藍色火焰
+        { x: 80, y: 55, r: 3, c: [255, 230, 80] }, // 角色本身
+        { x: 80, y: 5, r: 4, c: [237, 107, 140] }, // 首領血條
+      ]),
+    )!;
+    expect(g.x).toBeGreaterThan(0.2);
+    expect(g.y).toBeGreaterThan(0.1);
+  });
+  it('沒有光 → null', () => {
+    expect(findPortalGlow(make([]))).toBeNull();
   });
 });

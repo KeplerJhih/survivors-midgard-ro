@@ -22,6 +22,15 @@ describe('createFreezeDetector', () => {
     expect(d.ticking).toBe(false);
     expect(d.update(null, 9000)).toBe(false);
   });
+
+  it('停住期間偶爾讀不到時鐘，沿用停住狀態', () => {
+    const d = createFreezeDetector(3000);
+    let t = 0;
+    for (let s = 0; s < 3; s++, t += 1000) d.update(glyph(s), t);
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(50), t);
+    expect(d.update(null, t)).toBe(true);
+    expect(d.update(glyph(50), t + 1000)).toBe(true);
+  });
 });
 
 describe('findMinimapSquare + clockGlyph', () => {
@@ -34,6 +43,7 @@ describe('findMinimapSquare + clockGlyph', () => {
     for (let x = 40; x < 140; x++) {
       data.set([148, 168, 219, 255], (20 * W + x) * 4);
       data.set([148, 168, 219, 255], (120 * W + x) * 4);
+      data.set([148, 168, 219, 255], (121 * W + x) * 4); // 雙列邊框：取上面那列
     }
     for (let y = 142; y < 149; y++) for (let x = 50; x < 50 + digits; x++) data.set([20, 20, 30, 255], (y * W + x) * 4);
     return { width: W, height: H, data };
