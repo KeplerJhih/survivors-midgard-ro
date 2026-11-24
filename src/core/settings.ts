@@ -16,7 +16,7 @@ export interface BotConfig {
   dodge: boolean;
   /** 以畫面外指示器自動前往寶箱、任務 NPC、金波利；避開催眠師 */
   seekTargets: boolean;
-  /** 以樣板比對找木箱/鐵箱並撞破（掉 zeny/藥水） */
+  /** （實驗）以樣板比對找木箱/鐵箱並撞破。實機鑑別力不足（真箱 0.71~0.78、草地誤判 0.69~0.74），預設關閉 */
   seekObjects: boolean;
   /** 以畫面辨識自動處理：結算頁（再玩一次）、確認框（仍要離開/繼續）、初始技能（上次選擇） */
   autoContinue: boolean;
@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
     pickIntervalMs: 1500,
     portalSeek: true,
     seekTargets: true,
-    seekObjects: true,
+    seekObjects: false,
     dodge: true,
     lowHpRatio: 0.35,
     bossKite: true,

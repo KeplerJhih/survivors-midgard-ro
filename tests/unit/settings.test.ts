@@ -14,7 +14,8 @@ describe('mergeSettings', () => {
     expect(s.bot.pickIntervalMs).toBe(DEFAULT_SETTINGS.bot.pickIntervalMs);
   });
 
-  it('預設不啟用掛機', () => {
+  it('預設不啟用掛機；實驗中的打箱子預設關閉', () => {
     expect(DEFAULT_SETTINGS.bot.enabled).toBe(false);
+    expect(DEFAULT_SETTINGS.bot.seekObjects).toBe(false);
   });
 });
