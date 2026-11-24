@@ -11,6 +11,8 @@ export interface BotConfig {
   enterIntervalMs: number;
   /** MVP 打完後，以畫面辨識自動走進「返回地圖」傳送門（避開紅色業力傳送門） */
   portalSeek: boolean;
+  /** 以畫面辨識自動處理：結算頁（再玩一次）、確認框（仍要離開/繼續）、初始技能（上次選擇） */
+  autoContinue: boolean;
 }
 
 export interface Settings {
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: Settings = {
     enterEnabled: false,
     enterIntervalMs: 3000,
     portalSeek: true,
+    autoContinue: true,
   },
 };
 

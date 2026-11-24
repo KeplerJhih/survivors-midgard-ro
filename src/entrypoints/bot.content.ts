@@ -2,12 +2,14 @@ import { createWorkerTicker } from '@/core/background/ticker';
 import { createBot } from '@/core/bot/bot';
 import { createOverlay } from '@/core/debug/overlay';
 import { createKeyboard } from '@/core/input/keyboard';
+import { createPointer } from '@/core/input/pointer';
 import { createLogger } from '@/core/log';
 import { GAME_MATCHES, isBridgeMessage, type BridgeMessage } from '@/core/messages';
 import { DEFAULT_SETTINGS, mergeSettings, type Settings } from '@/core/settings';
 import { installMouseToTouch } from '@/core/touch/mouse-to-touch';
 import { createCanvasSampler } from '@/core/vision/frame';
 import { scanPortals } from '@/core/vision/portal';
+import { detectScreen } from '@/core/vision/screens';
 
 const TICK_MS = 50;
 
@@ -38,6 +40,11 @@ export default defineContentScript({
         const frame = sample();
         return frame ? scanPortals(frame) : null;
       },
+      detectScreen: () => {
+        const frame = sample();
+        return frame ? detectScreen(frame) : null;
+      },
+      pointer: createPointer(canvas, () => /iPhone/.test(navigator.userAgent)),
       log,
     });
     const overlay = createOverlay(document);
@@ -86,6 +93,7 @@ export default defineContentScript({
         dirs: bot.state.dirs.join('+') || '-',
         ticks: bot.state.ticks,
         scans: bot.state.scans,
+        screen: `${bot.state.lastScreen} ×${bot.state.screenTaps}`,
         picks: bot.state.picks,
         enters: bot.state.enters,
         touch: removeTouch ? 'bridge' : '-',

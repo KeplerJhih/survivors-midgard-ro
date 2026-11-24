@@ -94,5 +94,27 @@ describe('bot', () => {
     bot.tick();
     expect(calls).toBe(0);
   });
+
+  it('停在需要點擊的畫面時：放開方向鍵並點擊', async () => {
+    let t = 0;
+    const taps: [number, number][] = [];
+    const target = new EventTarget();
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => ({ kind: 'result', x: 0.4, y: 0.95 }),
+        pointer: { tap: async (x, y) => void taps.push([x, y]) },
+      },
+    );
+    bot.tick();
+    expect(bot.state.activity).toBe('screen');
+    expect([...keyboard.held()].filter((k) => k !== 'pick1')).toEqual([]);
+    t += 500;
+    bot.tick();
+    expect(taps).toEqual([[0.4, 0.95]]);
+  });
 });
 
