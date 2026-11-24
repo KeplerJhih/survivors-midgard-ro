@@ -174,6 +174,21 @@ describe('decideByLayout（結構判斷）', () => {
     expect(decide(f)?.kind).not.toBe('result');
   });
 
+  it('初始技能 2×2 選項格：點色帶與眾不同的「上次選擇」那張', () => {
+    const f = draw(GRASS, [
+      { x0: 0.31, y0: 0.22, x1: 0.69, y1: 0.78, fill: PANEL },
+      { x0: 0.33, y0: 0.3, x1: 0.49, y1: 0.5, fill: PANEL },
+      { x0: 0.33, y0: 0.3, x1: 0.49, y1: 0.34, fill: [255, 200, 160], border: [217, 107, 13] }, // 上次選擇色帶
+      { x0: 0.51, y0: 0.3, x1: 0.67, y1: 0.5, fill: PANEL },
+      { x0: 0.35, y0: 0.56, x1: 0.49, y1: 0.76, fill: PANEL },
+      { x0: 0.51, y0: 0.56, x1: 0.65, y1: 0.76, fill: PANEL },
+    ]);
+    const a = decide(f)!;
+    expect(a.kind).toBe('start-skill');
+    expect(a.x).toBeLessThan(0.5);
+    expect(a.y).toBeLessThan(0.55);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },

@@ -12,6 +12,7 @@ import type { ScreenAction } from './screens';
  * - 確認框/對話：非全寬面板，最下排 2 顆按鈕 → 最右（[要再想想][仍要離開]、[離開遊戲][留下]、任務 [先不要][我來幫忙！] 最右皆為想要的）
  * - 置中單一寬按鈕（新卡片/暫停選單「繼續」）→ 點它（必須先於「最寬按鈕」，暫停選單最下排有「放棄本局」）
  * - 選地圖/準備：最下排有明顯最寬的按鈕（選擇、出發冒險）→ 點它
+ * - 初始技能（選項格）：等大的面板排成格子 → 與眾不同（上次選擇）的那張，否則第一張
  */
 export type RarityRank = (rgb: [number, number, number]) => number;
 
@@ -148,7 +149,61 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   // 大區塊右下角獨自一排的按鈕（選地圖「選擇 ▶」：返回/狂熱太小切不出來，只剩它）
   const corner = cornerButton(regions, buttons);
   if (corner) return tap('map-select', corner);
+  // 選項格（初始技能等）：同一大區塊內 ≥2 個等大、無按鈕的面板 → 點「與眾不同」的那張（上次選擇有不同色帶），否則第一張
+  const grid = optionGrid(f, regions, buttons);
+  if (grid) return tap('start-skill', grid);
   return null;
+}
+
+/**
+ * 選項格：面積 ≥ 15% 的大區塊內，有 ≥ 2 個寬高相近（±3%）、內部沒有按鈕的面板。
+ * 「上次選擇」的卡頂端色帶與其他卡不同（不寫死顏色：取與其他卡平均色差最大者，差距夠大才採用）。
+ * 實機：初始技能 2×2 四張卡被歸為 panel（高 18~20%），外層為 other 大區塊。
+ */
+function optionGrid(f: Frame, regions: Region[], buttons: Region[]): Region | null {
+  const outer = regions.filter((r) => rw(r) * rh(r) >= 0.15);
+  for (const box of outer) {
+    const opts = regions.filter(
+      (r) =>
+        r !== box &&
+        r.kind === 'panel' &&
+        inside(r, box, 0.01) &&
+        rw(r) * rh(r) >= 0.015 &&
+        !buttons.some((b) => inside(b, r, 0.005)),
+    );
+    const ref = opts[0];
+    if (!ref) continue;
+    const same = opts.filter((r) => Math.abs(rw(r) - rw(ref)) <= 0.03 && Math.abs(rh(r) - rh(ref)) <= 0.03);
+    if (same.length < 2) continue;
+    const ordered = [...same].sort((a, b) => (Math.abs(cy(a) - cy(b)) > 0.05 ? cy(a) - cy(b) : cx(a) - cx(b)));
+    const bands = ordered.map((r) => topBand(f, r));
+    const dist = bands.map((c, i) => {
+      const others = bands.filter((_, j) => j !== i);
+      const mean = [0, 1, 2].map((k) => others.reduce((s, o) => s + o[k]!, 0) / others.length);
+      return Math.hypot(c[0]! - mean[0]!, c[1]! - mean[1]!, c[2]! - mean[2]!);
+    });
+    const best = dist.indexOf(Math.max(...dist));
+    return ordered.length >= 3 && dist[best]! >= 40 ? ordered[best]! : ordered[0]!;
+  }
+  return null;
+}
+
+/** 區塊頂端（上緣上下各約 3%）一條橫帶的平均色 */
+function topBand(f: Frame, r: Region): number[] {
+  const W = f.width;
+  const H = f.height;
+  let n = 0;
+  const sum: [number, number, number] = [0, 0, 0];
+  for (let y = Math.max(0, Math.round((r.y0 - 0.03) * H)); y < Math.min(H, Math.round((r.y0 + 0.03) * H)); y++) {
+    for (let x = Math.round(r.x0 * W); x < Math.round(r.x1 * W); x += 2) {
+      const i = (y * W + x) * 4;
+      sum[0] += f.data[i]!;
+      sum[1] += f.data[i + 1]!;
+      sum[2] += f.data[i + 2]!;
+      n++;
+    }
+  }
+  return sum.map((v) => v / Math.max(1, n));
 }
 
 /** 大區塊（面板或直立卡片，面積 ≥ 15%）底部 25% 內、同排沒有其他按鈕、靠右半邊的最下方按鈕 */
