@@ -6,21 +6,40 @@ import { createLogger } from '@/core/log';
 import { GAME_MATCHES, isBridgeMessage, type BridgeMessage } from '@/core/messages';
 import { DEFAULT_SETTINGS, mergeSettings, type Settings } from '@/core/settings';
 import { installMouseToTouch } from '@/core/touch/mouse-to-touch';
+import { createCanvasSampler } from '@/core/vision/frame';
+import { scanPortals } from '@/core/vision/portal';
 
 const TICK_MS = 50;
+
+interface BotHandle {
+  dispose(): void;
+}
 
 export default defineContentScript({
   matches: GAME_MATCHES,
   world: 'MAIN',
   runAt: 'document_idle',
   main() {
-    const canvas = document.getElementById('canvas');
+    const canvas = document.getElementById('canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
+
+    // 外掛重新載入後會把本腳本再注入一次（不刷新網頁）：先清掉舊版實例
+    const g = window as unknown as { __msbot?: BotHandle };
+    g.__msbot?.dispose();
 
     let settings: Settings = DEFAULT_SETTINGS;
     const log = createLogger(() => settings.debug);
     const keyboard = createKeyboard(canvas, { onSend: (type, name) => log.debug(type, name) });
-    const bot = createBot(settings.bot, { keyboard, now: () => performance.now(), log });
+    const sample = createCanvasSampler(canvas);
+    const bot = createBot(settings.bot, {
+      keyboard,
+      now: () => performance.now(),
+      scanPortals: () => {
+        const frame = sample();
+        return frame ? scanPortals(frame) : null;
+      },
+      log,
+    });
     const overlay = createOverlay(document);
     let removeTouch: (() => void) | null = null;
 
@@ -39,30 +58,34 @@ export default defineContentScript({
     };
 
     let received = false;
-    window.addEventListener('message', (e) => {
+    const onMessage = (e: MessageEvent) => {
       if (e.source !== window || !isBridgeMessage(e.data)) return;
       if (e.data.type === 'settings') {
         received = true;
         apply(mergeSettings(e.data.settings));
       }
-    });
+    };
+    window.addEventListener('message', onMessage);
     // bridge（ISOLATED world）與本腳本的載入順序不固定，請求可能在對方開始監聽前送出而遺失：
     // 收到第一份設定前持續重送（實測：重新整理後掛機一直停在預設的停用狀態）
     const req: BridgeMessage = { __msbot: true, type: 'request-settings' };
+    let requestTimer: ReturnType<typeof setTimeout> | undefined;
     const requestSettings = () => {
       if (received) return;
       window.postMessage(req, location.origin);
-      setTimeout(requestSettings, 500);
+      requestTimer = setTimeout(requestSettings, 500);
     };
     requestSettings();
 
-    createWorkerTicker(TICK_MS, () => {
+    const ticker = createWorkerTicker(TICK_MS, () => {
       bot.tick();
       overlay.render({
         bot: bot.state.running ? 'ON' : 'off',
+        activity: bot.state.activity,
         visibility: document.visibilityState,
         dirs: bot.state.dirs.join('+') || '-',
         ticks: bot.state.ticks,
+        scans: bot.state.scans,
         picks: bot.state.picks,
         enters: bot.state.enters,
         touch: removeTouch ? 'bridge' : '-',
@@ -70,13 +93,22 @@ export default defineContentScript({
     });
 
     // DevTools 除錯用：__msbot.bot.state、__msbot.apply({...})
-    (window as unknown as { __msbot: unknown }).__msbot = {
+    g.__msbot = {
       bot,
       keyboard,
       apply,
       get settings() {
         return settings;
       },
-    };
+      dispose() {
+        ticker.stop();
+        clearTimeout(requestTimer);
+        window.removeEventListener('message', onMessage);
+        keyboard.releaseAll();
+        removeTouch?.();
+        overlay.remove();
+      },
+    } as BotHandle;
+    log.info('bot 已啟動');
   },
 });

@@ -5,7 +5,7 @@ Midgard Survivors 網頁版（https://midgardsurvivors.com/play/）的 Chrome �
 - **模擬 iPhone**：通過網頁版的 iOS 判斷，進入觸控介面（虛擬搖桿）
 - **滑鼠轉觸控**：手機模式下用滑鼠拖曳操作虛擬搖桿
 - **背景持續執行**：切到其他分頁時遊戲不會停
-- **掛機**：自動走位（繞圈）、自動選升級卡，可選自動按 Enter
+- **掛機**：自動走位（8 字形 / 繞圈）、自動選升級卡、MVP 後自動走回地圖，可選自動按 Enter
 
 ## 安裝（不需要 Node）
 
@@ -16,7 +16,7 @@ repo 內已附上編譯好的外掛 `output/`：
 3. 「載入未封裝項目」→ 選 `output` 資料夾
 4. 開啟 https://midgardsurvivors.com/play/ ，點外掛圖示調整設定
 
-更新：`git pull` 後按 popup 的「🔄 重新載入外掛＋遊戲頁」。
+更新：`git pull` 後按 popup 的「🔄 重新載入外掛（不刷新遊戲）」。
 
 ## 開發
 
@@ -30,7 +30,7 @@ npm run typecheck
 npm run build      # 產出 output/（有進版控，改完 code 記得 build 再 commit；npm run dev 也會寫到這裡，commit 前要再 build 一次）
 ```
 
-第一次載入後，之後每次 `npm run build` 完，按 popup 的「🔄 重新載入外掛＋遊戲頁」即可套用新版。
+第一次載入後，之後每次 `npm run build` 完，按 popup 的「🔄 重新載入外掛（不刷新遊戲）」即可套用新版掛機邏輯；「模擬 iPhone」「背景持續執行」的程式改動仍需重新整理遊戲頁。
 
 ## 結構
 
@@ -38,6 +38,7 @@ npm run build      # 產出 output/（有進版控，改完 code 記得 build �
 src/core/            純邏輯，不依賴 chrome.* API，可單獨測試
   input/keyboard     送合成 KeyboardEvent（帶 key / code / keyCode）
   movement/          走位策略（純函式：經過時間 → 方向鍵）
+  vision/            畫面辨識（canvas 取樣、MVP 傳送門）
   bot/               掛機主迴圈
   spoof/mobile       iPhone 偽裝（UA、platform、maxTouchPoints、matchMedia）
   touch/             滑鼠 → 觸控事件
@@ -52,6 +53,11 @@ src/entrypoints/     WXT 外掛殼
   popup/             設定介面
 tests/unit/          單元測試
 ```
+
+## 文件
+
+- [docs/MECHANICS.md](docs/MECHANICS.md)：遊戲機制（輸入、觸控、背景執行、MVP、撿取、反作弊）
+- [docs/FEATURES.md](docs/FEATURES.md)：功能開關、優化紀錄、待辦
 
 ## Debug
 

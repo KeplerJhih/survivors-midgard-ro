@@ -1,24 +1,6 @@
 import { GAME_MATCHES, RELOAD_MESSAGE } from '@/core/messages';
 import type { Settings } from '@/core/settings';
 import { loadSettings, watchSettings } from '@/utils/settings-store';
-import { storage } from '#imports';
-
-/** 重新載入外掛前記下的遊戲分頁，外掛重啟後重新整理它們（不能用 session：reload 時會被清空） */
-const pendingReloadTabs = storage.defineItem<number[]>('local:pendingReloadTabs', { fallback: [] });
-
-/** popup「重新載入」：讀取磁碟上最新 build 的外掛，並重新整理遊戲分頁讓新腳本注入 */
-async function reloadExtensionAndGame() {
-  const tabs = await browser.tabs.query({ url: GAME_MATCHES });
-  await pendingReloadTabs.setValue(tabs.flatMap((t) => (t.id == null ? [] : [t.id])));
-  browser.runtime.reload();
-}
-
-async function reloadPendingTabs() {
-  const ids = await pendingReloadTabs.getValue();
-  if (ids.length === 0) return;
-  await pendingReloadTabs.setValue([]);
-  for (const id of ids) await browser.tabs.reload(id).catch(() => {}); // 分頁可能已被關閉
-}
 
 /**
  * 需要在 document_start、MAIN world 執行且可開關的腳本，改用動態註冊：
@@ -28,6 +10,30 @@ const RUNTIME_SCRIPTS: { id: string; file: string; enabled: (s: Settings) => boo
   { id: 'mobile', file: 'content-scripts/mobile.js', enabled: (s) => s.mobile },
   { id: 'keepalive', file: 'content-scripts/keepalive.js', enabled: (s) => s.background },
 ];
+
+/** popup「重新載入」：讀取磁碟上最新 build 的外掛；不刷新網頁，由 onInstalled 重新注入 */
+function reloadExtension() {
+  browser.runtime.reload();
+}
+
+/**
+ * 外掛重新載入/更新後，既有分頁裡的舊 content script 會失聯（ISOLATED world 失去 chrome.* API），
+ * 直接把新版 bridge + bot 注入進去即可，不用刷新遊戲（bot 會先 dispose 舊實例）。
+ * mobile / keepalive 屬於 document_start 腳本，改動後仍需重新整理頁面才會套用。
+ */
+async function reinjectGameTabs() {
+  const tabs = await browser.tabs.query({ url: GAME_MATCHES });
+  for (const tab of tabs) {
+    if (tab.id == null) continue;
+    const target = { tabId: tab.id };
+    try {
+      await browser.scripting.executeScript({ target, files: ['/content-scripts/bridge.js'] });
+      await browser.scripting.executeScript({ target, files: ['/content-scripts/bot.js'], world: 'MAIN' });
+    } catch (err) {
+      console.warn('reinject failed', tab.id, err);
+    }
+  }
+}
 
 async function sync(settings: Settings) {
   const registered = new Set(
@@ -53,10 +59,13 @@ async function sync(settings: Settings) {
 }
 
 export default defineBackground(() => {
-  // 先完成腳本註冊，再重新整理分頁，document_start 腳本才會注入
-  loadSettings().then(sync).then(reloadPendingTabs).catch(console.error);
+  loadSettings().then(sync).catch(console.error);
   watchSettings((s) => sync(s).catch(console.error));
+  // 只在安裝/更新/重新載入時注入（service worker 閒置後重啟也會跑到這裡，不能每次都注入）
+  browser.runtime.onInstalled.addListener(() => {
+    reinjectGameTabs().catch(console.error);
+  });
   browser.runtime.onMessage.addListener((msg: unknown) => {
-    if ((msg as { type?: string })?.type === RELOAD_MESSAGE) reloadExtensionAndGame().catch(console.error);
+    if ((msg as { type?: string })?.type === RELOAD_MESSAGE) reloadExtension();
   });
 });

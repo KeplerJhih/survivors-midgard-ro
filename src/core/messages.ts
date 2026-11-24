@@ -11,5 +11,5 @@ export function isBridgeMessage(data: unknown): data is BridgeMessage {
 
 export const GAME_MATCHES = ['https://midgardsurvivors.com/play/*'];
 
-/** popup → background：重新載入外掛並重新整理遊戲分頁 */
+/** popup → background：重新載入外掛（不刷新遊戲分頁） */
 export const RELOAD_MESSAGE = 'msbot:reload';

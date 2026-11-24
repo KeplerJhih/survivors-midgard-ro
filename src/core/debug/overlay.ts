@@ -1,10 +1,12 @@
 export interface Overlay {
   setVisible(visible: boolean): void;
   render(data: Record<string, unknown>): void;
+  remove(): void;
 }
 
 /** 疊在遊戲上的半透明 debug 面板（不攔截滑鼠） */
 export function createOverlay(doc: Document): Overlay {
+  doc.getElementById('msbot-overlay')?.remove();
   const el = doc.createElement('pre');
   el.id = 'msbot-overlay';
   Object.assign(el.style, {
@@ -35,5 +37,6 @@ export function createOverlay(doc: Document): Overlay {
         .map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
         .join('\n');
     },
+    remove: () => el.remove(),
   };
 }

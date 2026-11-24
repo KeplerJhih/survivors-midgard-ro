@@ -9,6 +9,8 @@ export interface BotConfig {
   /** 週期送 Enter（寶箱/結算）。⚠️ 在城鎮會開世界聊天，預設關閉 */
   enterEnabled: boolean;
   enterIntervalMs: number;
+  /** MVP 打完後，以畫面辨識自動走進「返回地圖」傳送門（避開紅色業力傳送門） */
+  portalSeek: boolean;
 }
 
 export interface Settings {
@@ -30,11 +32,12 @@ export const DEFAULT_SETTINGS: Settings = {
   debug: false,
   bot: {
     enabled: false,
-    mode: 'circle',
+    mode: 'figure8',
     circlePeriodMs: 4000,
     pickIntervalMs: 1500,
     enterEnabled: false,
     enterIntervalMs: 3000,
+    portalSeek: true,
   },
 };
 

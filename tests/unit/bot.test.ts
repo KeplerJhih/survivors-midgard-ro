@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { createBot } from '@/core/bot/bot';
 import { createKeyboard } from '@/core/input/keyboard';
 import { DEFAULT_SETTINGS, type BotConfig } from '@/core/settings';
+import type { PortalScan } from '@/core/vision/portal';
 
-function setup(overrides: Partial<BotConfig> = {}) {
+function setup(overrides: Partial<BotConfig> = {}, scan?: () => PortalScan | null) {
   let t = 0;
   const sent: string[] = [];
   const target = new EventTarget();
@@ -11,8 +12,8 @@ function setup(overrides: Partial<BotConfig> = {}) {
     target.addEventListener(type, (e) => sent.push(`${type}:${(e as KeyboardEvent).code}`));
   }
   const keyboard = createKeyboard(target, { sleep: async () => {} });
-  const cfg: BotConfig = { ...DEFAULT_SETTINGS.bot, ...overrides };
-  const bot = createBot(cfg, { keyboard, now: () => t });
+  const cfg: BotConfig = { ...DEFAULT_SETTINGS.bot, mode: 'circle', ...overrides };
+  const bot = createBot(cfg, { keyboard, now: () => t, scanPortals: scan });
   const heldDirs = () => [...keyboard.held()].filter((k) => k !== 'pick1' && k !== 'enter');
   return { bot, keyboard, heldDirs, sent, advance: (ms: number) => (t += ms), cfg };
 }
@@ -68,4 +69,30 @@ describe('bot', () => {
     bot.update({ ...cfg, enabled: false });
     expect(keyboard.held().size).toBe(0);
   });
+
+  it('確認看到返回地圖傳送門後改為朝它走，消失後回到原本走位', () => {
+    let exit: PortalScan['exit'] = { count: 30, x: 0, y: 0.3, w: 0.05, h: 0.05 }; // 正下方
+    const { bot, heldDirs, advance } = setup({ enabled: true, circlePeriodMs: 8000 }, () => ({ exit, danger: null }));
+    for (let i = 0; i < 3; i++) {
+      bot.tick();
+      advance(250);
+    }
+    expect(bot.state.activity).toBe('portal');
+    expect(heldDirs()).toEqual(['down']);
+
+    exit = null;
+    for (let i = 0; i < 6; i++) {
+      bot.tick();
+      advance(250);
+    }
+    expect(bot.state.activity).toBe('patrol');
+  });
+
+  it('portalSeek 關閉時不掃描畫面', () => {
+    let calls = 0;
+    const { bot } = setup({ enabled: true, portalSeek: false }, () => (calls++, null));
+    bot.tick();
+    expect(calls).toBe(0);
+  });
 });
+
