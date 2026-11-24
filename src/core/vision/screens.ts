@@ -128,6 +128,14 @@ export function detectScreen(f: Frame): ScreenAction | null {
     };
   }
 
+  // 置中、夠寬的主要按鈕（新卡片/暫停選單的「繼續」，約 0.34W 寬）：不受視窗內容影響直接點
+  // 實機：Baphomet Card 的金色卡框 (255,199,56) 與傳說色相近 → 升級規則誤判、一直點卡圖而卡住；
+  // 卡圖偏暗也讓面板規則認不出來 → 此規則排在升級規則之前（升級視窗沒有寬的主要按鈕）
+  const wide = scan(f, isPrimaryBorder, { x0: 0.15, x1: 0.85, y0: 0.3, y1: 0.95 });
+  if (wide.n >= 4 && wide.maxX - wide.minX + 1 >= 0.2 * W && Math.abs((wide.minX + wide.maxX + 1) / 2 / W - 0.5) < 0.1) {
+    return { kind: 'modal', x: (wide.minX + wide.maxX + 1) / 2 / W, y: (wide.minY + 0.5) / H + 0.02 };
+  }
+
   // 升級選卡：點稀有度最高的卡（同稀有度多張時取像素最多那張）
   if (light >= 0.15) {
     const pick = pickRarestCard(f);

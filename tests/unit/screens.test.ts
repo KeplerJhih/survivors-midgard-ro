@@ -79,6 +79,18 @@ describe('detectScreen', () => {
     expect(a.y).toBeLessThan(0.82);
   });
 
+  it('置中寬主要按鈕優先（MVP 卡的金框與傳說色相近也不誤判成升級；卡圖偏暗也點得到）', () => {
+    const f = paint([40, 45, 30], [
+      { x0: 0.31, y0: 0.2, x1: 0.68, y1: 0.3, rgb: PANEL },
+      { x0: 0.41, y0: 0.28, x1: 0.59, y1: 0.62, rgb: [255, 199, 56] }, // 金色卡框（實機）
+      { x0: 0.42, y0: 0.3, x1: 0.58, y1: 0.6, rgb: [90, 70, 50] }, // 暗色卡圖
+      { x0: 0.33, y0: 0.768, x1: 0.67, y1: 0.776, rgb: BLUE_BORDER },
+    ]);
+    const a = detectScreen(f)!;
+    expect(a.kind).toBe('modal');
+    expect(a.x).toBeCloseTo(0.5, 1);
+  });
+
   it('確認框：背景被壓暗、中央亮色視窗 → 點右下角（實機約占畫面 27%×11%）', () => {
     const f = paint(SHADE, [{ x0: 0.36, y0: 0.44, x1: 0.64, y1: 0.56, rgb: PANEL }]);
     const a = detectScreen(f)!;
