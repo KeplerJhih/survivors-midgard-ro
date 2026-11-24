@@ -55,8 +55,12 @@ export default defineContentScript({
       detectScreen: () => {
         const frame = sampleUI();
         if (!frame) return null;
-        // 結構判斷優先；判斷不出來才用舊的顏色規則（逐步淘汰中）
-        return decideByLayout(frame, parseLayout(frame)) ?? detectScreen(frame);
+        // 結構判斷優先；舊顏色規則只保留特徵獨特的「結算頁」「腐化寶箱」
+        // （實機：城鎮明亮石板地讓舊「初始技能」規則把屋頂當成色帶、在城鎮亂點）
+        const structural = decideByLayout(frame, parseLayout(frame));
+        if (structural) return structural;
+        const legacy = detectScreen(frame);
+        return legacy && (legacy.kind === 'result' || legacy.kind === 'corrupt') ? legacy : null;
       },
       findIndicators: () => {
         const frame = sampleHi();
