@@ -58,7 +58,8 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
       if (last && last.length === glyph.length) {
         let d = 0;
         for (let i = 0; i < glyph.length; i++) d += glyph[i]! ^ last[i]!;
-        if (d > Math.max(3, Math.max(on, lastOn) * 0.1)) {
+        // 實機：每秒變一位數時差異 32~115 px（字形約 820 px），10% 門檻會把部分秒數當成沒變 → 2%
+        if (d > Math.max(3, Math.max(on, lastOn) * 0.02)) {
           changedAt = now;
           ticked = true;
         }
