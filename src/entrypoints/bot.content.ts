@@ -12,6 +12,7 @@ import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
 import { findIndicators } from '@/core/vision/indicators';
 import { probeDanger } from '@/core/vision/danger';
+import { readHp } from '@/core/vision/hud';
 
 const TICK_MS = 50;
 
@@ -55,6 +56,10 @@ export default defineContentScript({
       probeDanger: () => {
         const frame = sample();
         return frame ? probeDanger(frame) : null;
+      },
+      readHp: () => {
+        const frame = sampleHi();
+        return frame ? readHp(frame) : null;
       },
       pointer: createPointer(canvas, () => /iPhone/.test(navigator.userAgent)),
       log,
@@ -107,6 +112,7 @@ export default defineContentScript({
         scans: bot.state.scans,
         screen: `${bot.state.lastScreen} ×${bot.state.screenTaps}`,
         dodges: bot.state.dodges,
+        hp: bot.state.hp,
         picks: bot.state.picks,
         touch: removeTouch ? 'bridge' : '-',
       });

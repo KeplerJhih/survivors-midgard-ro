@@ -104,4 +104,31 @@ describe('bot', () => {
     bot.tick();
     expect(taps).toEqual([[0.4, 0.95]]);
   });
+
+  it('低血量：不追指示器目標、改大圈移動', () => {
+    let t = 0;
+    let fill = 20;
+    const target = new EventTarget();
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        readHp: () => ({ fill, low: fill < 5 }),
+        findIndicators: () => [{ kind: 'target', x: 0, y: -0.3, icon: [255, 218, 112], size: 0.05 }],
+      },
+    );
+    bot.tick();
+    t += 500;
+    bot.tick();
+    expect(bot.state.activity).toBe('target');
+
+    fill = 4; // 變紅
+    t += 500;
+    bot.tick();
+    expect(bot.state.activity).toBe('retreat');
+    expect(bot.state.hp).toBeCloseTo(0.2);
+  });
 });
+

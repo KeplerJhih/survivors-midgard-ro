@@ -8,13 +8,17 @@ import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { dodge, type DangerProbes } from '../vision/danger';
+import { createHpTracker, type HpReading } from '../vision/hud';
+import { circle } from '../movement/strategies';
 
 const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 
 export interface BotState {
   running: boolean;
   /** patrol：一般走位；portal：正在走向返回地圖傳送門 */
-  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'screen';
+  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'screen';
+  /** 最近讀到的 HP 比例（-1 表示讀不到） */
+  hp: number;
   dodges: number;
   /** 最近一次處理的畫面 */
   lastScreen: string;
@@ -43,6 +47,8 @@ export interface BotDeps {
   findIndicators?: () => Indicator[] | null;
   /** 探測角色周圍的紅色預警框；沒提供時不躲 */
   probeDanger?: () => DangerProbes | null;
+  /** 讀 HP 條；沒提供時不做低血量行為 */
+  readHp?: () => HpReading | null;
   pointer?: Pointer;
   log?: Logger;
 }
@@ -51,6 +57,9 @@ const SCAN_INTERVAL_MS = 250;
 const SCREEN_INTERVAL_MS = 500;
 const INDICATOR_INTERVAL_MS = 400;
 const DANGER_INTERVAL_MS = 150;
+const HP_INTERVAL_MS = 500;
+/** 低血量時的走位：大圈持續移動（週期為一般走位的 2.5 倍） */
+const RETREAT_PERIOD_FACTOR = 2.5;
 
 /**
  * 掛機主迴圈：
@@ -62,10 +71,11 @@ const DANGER_INTERVAL_MS = 150;
  */
 export function createBot(
   cfg: BotConfig,
-  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, pointer, log }: BotDeps,
+  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, readHp, pointer, log }: BotDeps,
 ): Bot {
   let config = cfg;
   let strategy: Strategy = createStrategy(cfg.mode, cfg);
+  let retreat: Strategy = circle(cfg.circlePeriodMs * RETREAT_PERIOD_FACTOR);
   let startedAt = now();
   let lastPick = -Infinity;
   let lastScan = -Infinity;
@@ -78,6 +88,9 @@ export function createBot(
   let lastDangerProbe = -Infinity;
   let probes: DangerProbes | null = null;
   let dodging = false;
+  let lastHpRead = -Infinity;
+  let lowHp = false;
+  const hpTracker = createHpTracker();
   let lastScreenCheck = -Infinity;
   let onScreen = false;
   const state: BotState = {
@@ -85,6 +98,7 @@ export function createBot(
     activity: 'patrol',
     lastScreen: '-',
     dodges: 0,
+    hp: -1,
     screenTaps: 0,
     dirs: [],
     scans: 0,
@@ -97,6 +111,7 @@ export function createBot(
     update(next) {
       if (next.mode !== config.mode || next.circlePeriodMs !== config.circlePeriodMs) {
         strategy = createStrategy(next.mode, next);
+        retreat = circle(next.circlePeriodMs * RETREAT_PERIOD_FACTOR);
       }
       if (next.enabled && !config.enabled) startedAt = now();
       if (!next.portalSeek) portalDirs = null;
@@ -143,15 +158,25 @@ export function createBot(
           portalDirs = next;
         }
       }
-      if (!portalDirs && config.seekTargets && findIndicators && t - lastIndicatorScan >= INDICATOR_INTERVAL_MS) {
+      if (readHp && t - lastHpRead >= HP_INTERVAL_MS) {
+        lastHpRead = t;
+        const hp = hpTracker.update(readHp());
+        state.hp = hp ? Math.round(hp.ratio * 100) / 100 : -1;
+        const nowLow = hp !== null && (hp.low || hp.ratio < config.lowHpRatio);
+        if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
+        lowHp = nowLow;
+      }
+
+      if (!lowHp && !portalDirs && config.seekTargets && findIndicators && t - lastIndicatorScan >= INDICATOR_INTERVAL_MS) {
         lastIndicatorScan = t;
         const next = targetSeeker.update(findIndicators(), t);
         if (next && !targetDirs) log?.info('target: 前往指示器目標');
         targetDirs = next;
       }
-      if (portalDirs || !config.seekTargets) targetDirs = null;
-      state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : 'patrol';
-      let want = portalDirs ?? targetDirs ?? strategy(t - startedAt);
+      if (portalDirs || !config.seekTargets || lowHp) targetDirs = null;
+      state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : lowHp ? 'retreat' : 'patrol';
+      const patrol = lowHp ? retreat(t - startedAt) : strategy(t - startedAt);
+      let want = portalDirs ?? targetDirs ?? patrol;
       if (config.dodge && probeDanger) {
         if (t - lastDangerProbe >= DANGER_INTERVAL_MS) {
           lastDangerProbe = t;
