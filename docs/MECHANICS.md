@@ -41,6 +41,14 @@
 | 官方「隨機選卡」開啟時 | — | 寶箱視窗也會整個跳過（`core/main.gd` `if menus.auto_pick: return`） |
 | MVP 戰 | 不暫停，計時停止 | 打完後出現傳送門，**不走進去就永遠停在 MVP 房**（`core/mvp_raid.gd` state `won`） |
 | 轉職 / 結算 | 會停 | 預設焦點按鈕，Enter 觸發 |
+| 腐化寶箱（選路線） | 會停 | 每張地圖第一次會跳窗；選過後同地圖自動沿用（`world.corrupt_auto`，換地圖重設）。⚠️ **預設焦點是 Hel**，按 Enter 會選 Hel |
+
+### 腐化寶箱路線
+
+- Hel → Niflheim：+8% 傷害、+1 等；代價 −25% HP、怪物 +6% 傷害。路線 MVP 墮落 Randgris，怪物 +35% 傷害並死亡爆炸
+- Valhalla：+6% HP 與回復、+1 等；代價怪物 +6% HP。路線 MVP Valkyrie Reginleif，怪物 +35% HP
+- 掛機建議 **Valhalla**（生存優先）。Valhalla 傳送門色 `Color(1.0,0.92,0.6)` 淡金，不會被當成青色出口
+- 視窗上方「這張地圖接下來的寶箱」：我選的道路（沿用）/ 隨機（`ui/menus.gd` `corrupt_auto_opts`）
 
 ### MVP 傳送門
 
