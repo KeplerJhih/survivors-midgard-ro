@@ -1,9 +1,11 @@
-import type { Settings } from './settings';
+import type { BotConfig, Settings } from './settings';
 
 /** ISOLATED world（可用 chrome.storage）與 MAIN world（可碰遊戲頁）之間的 postMessage 協定 */
 export type BridgeMessage =
   | { __msbot: true; type: 'request-settings' }
   | { __msbot: true; type: 'settings'; settings: Settings }
+  /** 從遊戲頁修改並儲存設定（淺合併；bot 欄位逐項合併），之後 bridge 會把新設定推回來 */
+  | { __msbot: true; type: 'set-settings'; patch: Partial<Omit<Settings, 'bot'>> & { bot?: Partial<BotConfig> } }
   /** 從遊戲頁要求重新載入外掛（開發部署用：載入磁碟上最新 build，onInstalled 會重新注入，不刷新遊戲） */
   | { __msbot: true; type: 'reload-extension' };
 

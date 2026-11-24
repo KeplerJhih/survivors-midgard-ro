@@ -130,6 +130,11 @@ export default defineContentScript({
       get settings() {
         return settings;
       },
+      /** DevTools：__msbot.saveSettings({ bot: { mode: 'flower' } }) → 寫入儲存設定（等同在 popup 修改） */
+      saveSettings(patch: Extract<BridgeMessage, { type: 'set-settings' }>['patch']) {
+        const msg: BridgeMessage = { __msbot: true, type: 'set-settings', patch };
+        window.postMessage(msg, location.origin);
+      },
       /** DevTools：__msbot.reloadExtension() → 載入最新 build 並重新注入（不刷新遊戲） */
       reloadExtension() {
         const msg: BridgeMessage = { __msbot: true, type: 'reload-extension' };
