@@ -71,11 +71,15 @@ export function createHpTracker(): HpTracker {
  */
 const BOSS_BAR: [number, number, number] = [237, 107, 140];
 
+/** 進入首領戰的門檻（血條像素占畫面比例）；已在首領戰中則降到 BOSS_STAY（血條剩很少時仍算首領戰） */
+export const BOSS_ENTER = 0.0015;
+export const BOSS_STAY = 0.0002;
+
 export function bossFight(f: Frame): boolean {
-  return bossBar(f) > 0;
+  return bossBar(f) >= BOSS_ENTER;
 }
 
-/** 首領血條剩餘量（血條像素占畫面比例；沒有首領戰為 0） */
+/** 首領血條剩餘量（血條像素占畫面比例，不設門檻） */
 export function bossBar(f: Frame): number {
   const { width: W, height: H, data } = f;
   let n = 0;
@@ -85,20 +89,22 @@ export function bossBar(f: Frame): number {
       if (near(data[i]!, data[i + 1]!, data[i + 2]!, BOSS_BAR, 35)) n++;
     }
   }
-  return n >= W * H * 0.0015 ? n / (W * H) : 0;
+  return n / (W * H);
 }
 
 /**
  * 首領戰是否「沒在打」：血條連續 stallMs 沒有下降（實機：Thief Bug Egg 在畫面外，
  * 大圈風箏繞著起點轉、一直打不到，血量停在 100% 超過一分鐘）→ 改回一般走位去找它。
  * 血條一開始下降就恢復風箏。
+ * 雙門檻：≥ BOSS_ENTER 才進入首領戰，之後 ≥ BOSS_STAY 就維持（實機：MVP 剩 25% 時血條像素低於進入門檻，被當成沒首領、跑去追指示器）。
  */
 export function createBossTracker(stallMs = 15000) {
   let best = Infinity;
   let progressAt = 0;
   return {
     update(bar: number, now: number): { boss: boolean; stalled: boolean } {
-      if (bar <= 0) {
+      const inFight = best !== Infinity;
+      if (bar < (inFight ? BOSS_STAY : BOSS_ENTER)) {
         best = Infinity;
         return { boss: false, stalled: false };
       }

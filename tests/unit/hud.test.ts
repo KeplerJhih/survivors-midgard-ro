@@ -56,6 +56,14 @@ describe('createBossTracker', () => {
     expect(t.update(0.003, 15000).stalled).toBe(true);
     expect(t.update(0.0028, 16000).stalled).toBe(false);
   });
+  it('雙門檻：進入要夠長的血條，之後剩很少仍算首領戰', () => {
+    const t = createBossTracker(15000);
+    expect(t.update(0.001, 0).boss).toBe(false);
+    expect(t.update(0.003, 100).boss).toBe(true);
+    expect(t.update(0.0005, 200).boss).toBe(true);
+    expect(t.update(0.0001, 300).boss).toBe(false);
+  });
+
   it('首領戰結束（血條消失）重置', () => {
     const t = createBossTracker(15000);
     t.update(0.003, 0);
