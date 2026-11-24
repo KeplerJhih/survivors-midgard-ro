@@ -10,6 +10,8 @@ import { installMouseToTouch } from '@/core/touch/mouse-to-touch';
 import { createCanvasSampler } from '@/core/vision/frame';
 import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
+import { parseLayout } from '@/core/vision/layout';
+import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
 import { fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { bossFight, readHp } from '@/core/vision/hud';
@@ -38,6 +40,8 @@ export default defineContentScript({
     const sample = createCanvasSampler(canvas);
     // 指示器圓盤較小，用較高解析度取樣
     const sampleHi = createCanvasSampler(canvas, 320);
+    // UI 結構解析需要較高解析度（按鈕外框 1~2px）
+    const sampleUI = createCanvasSampler(canvas, 640);
     const bot = createBot(settings.bot, {
       keyboard,
       now: () => performance.now(),
@@ -46,8 +50,10 @@ export default defineContentScript({
         return frame ? scanPortals(frame) : null;
       },
       detectScreen: () => {
-        const frame = sample();
-        return frame ? detectScreen(frame) : null;
+        const frame = sampleUI();
+        if (!frame) return null;
+        // 結構判斷優先；判斷不出來才用舊的顏色規則（逐步淘汰中）
+        return decideByLayout(frame, parseLayout(frame)) ?? detectScreen(frame);
       },
       findIndicators: () => {
         const frame = sampleHi();

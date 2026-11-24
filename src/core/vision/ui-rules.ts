@@ -1,0 +1,115 @@
+import type { Frame } from './frame';
+import { cx, cy, inside, rh, rows, rw, type Region } from './layout';
+import type { ScreenAction } from './screens';
+
+/**
+ * 以版面結構（區塊的形狀、大小、排列）判斷畫面並決定要點哪裡；不依賴特定 UI 顏色。
+ * 依遊戲程式（ui/menus.gd）的版面：
+ * - 腐化寶箱：兩張卡並排、各有「選擇這條路」按鈕，左 Hel 右 Valhalla → 點右卡按鈕
+ * - 初始技能：卡片頂端有「上次選擇」小色帶 → 點那張；沒有就點第一張
+ * - 升級：一排 2~4 張卡（無按鈕）→ 稀有度最高（稀有度本身由外框色表示，僅此處比較顏色）
+ * - 結算：近全寬面板，最下排 4 顆按鈕 [選擇目的地][再玩一次][前往城鎮][更換職業] → 第 2 顆
+ * - 確認框：小面板，最下排 2 顆按鈕 → 最右（[要再想想][仍要離開]、[離開遊戲][留下] 最右皆安全）
+ * - 置中單一寬按鈕（新卡片/暫停選單「繼續」）→ 點它（必須先於「最寬按鈕」，暫停選單最下排有「放棄本局」）
+ * - 選地圖/準備：最下排有明顯最寬的按鈕（選擇、出發冒險）→ 點它
+ */
+export type RarityRank = (rgb: [number, number, number]) => number;
+
+/** 卡片外框平均色 → 稀有度等級（越大越稀有）；-1 表示無法判斷 */
+export const defaultRarity: RarityRank = ([r, g, b]) => {
+  const palette: [number, [number, number, number]][] = [
+    [4, [217, 107, 13]], // 進化
+    [3, [255, 173, 38]], // 傳說
+    [2, [179, 89, 242]], // 史詩
+    [1, [77, 140, 255]], // 稀有
+  ];
+  let best = 0;
+  let bestD = 60 * 60;
+  for (const [rank, c] of palette) {
+    const d = (r - c[0]) ** 2 + (g - c[1]) ** 2 + (b - c[2]) ** 2;
+    if (d < bestD) (bestD = d), (best = rank);
+  }
+  return best;
+};
+
+/** 卡片外框一圈（外擴 1~2px）的「最飽和」像素平均色 */
+function borderColor(f: Frame, r: Region): [number, number, number] {
+  const W = f.width;
+  const H = f.height;
+  const pts: [number, number, number][] = [];
+  const push = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    const i = (y * W + x) * 4;
+    pts.push([f.data[i]!, f.data[i + 1]!, f.data[i + 2]!]);
+  };
+  const X0 = Math.round(r.x0 * W), X1 = Math.round(r.x1 * W), Y0 = Math.round(r.y0 * H), Y1 = Math.round(r.y1 * H);
+  for (const d of [1, 2]) {
+    for (let x = X0; x < X1; x += 2) push(x, Y0 - d), push(x, Y1 - 1 + d);
+    for (let y = Y0; y < Y1; y += 2) push(X0 - d, y), push(X1 - 1 + d, y);
+  }
+  const sat = (p: [number, number, number]) => Math.max(...p) - Math.min(...p);
+  pts.sort((a, b) => sat(b) - sat(a));
+  const top = pts.slice(0, Math.max(1, Math.floor(pts.length * 0.3)));
+  const avg = [0, 1, 2].map((k) => Math.round(top.reduce((s, p) => s + p[k]!, 0) / top.length));
+  return avg as [number, number, number];
+}
+
+const tap = (kind: ScreenAction['kind'], r: Region): ScreenAction => ({ kind, x: cx(r), y: cy(r) });
+
+export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank = defaultRarity): ScreenAction | null {
+  const buttons = regions.filter((r) => r.kind === 'button');
+  const panels = regions.filter((r) => r.kind === 'panel');
+  const cards = regions.filter((r) => r.kind === 'card');
+
+  // ---- 腐化寶箱：兩個大小相同、並排、各含一顆按鈕的區塊（卡片偏方，會被歸為 panel 或 card）----
+  const boxes = regions.filter((r) => (r.kind === 'panel' || r.kind === 'card') && rw(r) < 0.6 && rh(r) >= 0.2);
+  for (const pair of rows(boxes, 0.03, 0.05)) {
+    if (pair.length !== 2) continue;
+    const [a, b] = pair as [Region, Region];
+    if (Math.abs(rw(a) - rw(b)) > 0.03) continue;
+    const btnA = buttons.find((x) => inside(x, a, 0.01));
+    const btnB = buttons.find((x) => inside(x, b, 0.01));
+    if (btnA && btnB) return tap('corrupt', btnB);
+  }
+
+  // ---- 卡片列 ----
+  const cardRow = rows(cards, 0.05, 0.12)
+    .filter((g) => g.length >= 2 && g.length <= 4)
+    .sort((a, b) => b.length - a.length)[0];
+  if (cardRow) {
+    const ranks = cardRow.map((c) => rarity(borderColor(f, c)));
+    const top = Math.max(...ranks);
+    const pick = cardRow[ranks.indexOf(top)]!;
+    return tap(top > 0 ? 'level-up' : 'start-skill', pick);
+  }
+
+  // ---- 按鈕列 ----
+  const buttonRows = rows(buttons);
+  const bottom = buttonRows.filter((g) => g.length >= 2).sort((a, b) => cy(b[0]!) - cy(a[0]!))[0];
+  const container = (row: Region[]) =>
+    panels
+      .filter((p) => row.every((b) => b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02) && cy(row[0]!) > p.y0)
+      .sort((a, b) => rw(a) * rh(a) - rw(b) * rh(b))[0];
+
+  if (bottom && bottom.length === 4) {
+    const p = container(bottom);
+    if (p && rw(p) >= 0.8) return tap('result', bottom[1]!);
+  }
+  if (bottom && bottom.length === 2) {
+    const p = container(bottom);
+    if (p && rw(p) * rh(p) < 0.15 && Math.abs(cx(p) - 0.5) < 0.12) return tap('dialog', bottom[1]!);
+  }
+  // 置中單一寬按鈕（獨自一排）
+  const wide = buttonRows
+    .filter((g) => g.length === 1)
+    .map((g) => g[0]!)
+    .filter((b) => rw(b) >= 0.2 && Math.abs(cx(b) - 0.5) < 0.1)
+    .sort((a, b) => cy(b) - cy(a))[0];
+  if (wide) return tap('modal', wide);
+  // 最下排明顯最寬的按鈕
+  if (bottom) {
+    const byWidth = [...bottom].sort((a, b) => rw(b) - rw(a));
+    if (rw(byWidth[0]!) >= 1.4 * rw(byWidth[1]!)) return tap('map-select', byWidth[0]!);
+  }
+  return null;
+}
