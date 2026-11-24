@@ -1,22 +1,22 @@
 import type { Keyboard } from '../input/keyboard';
+import type { Pointer } from '../input/pointer';
 import type { Logger } from '../log';
 import type { Dir } from '../movement/directions';
-import { createStrategy, type Strategy } from '../movement/strategies';
+import { circle, createStrategy, type Strategy } from '../movement/strategies';
 import type { BotConfig } from '../settings';
-import type { Pointer } from '../input/pointer';
+import type { DangerProbes } from '../vision/danger';
+import { createHpTracker, type HpReading } from '../vision/hud';
+import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
-import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
-import { dodge, type DangerProbes } from '../vision/danger';
-import { createHpTracker, type HpReading } from '../vision/hud';
-import { circle } from '../movement/strategies';
+import { decide, type Activity } from './decide';
+import { throttle } from './throttle';
 
 const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 
 export interface BotState {
   running: boolean;
-  /** patrol：一般走位；portal：正在走向返回地圖傳送門 */
-  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'kite' | 'flee' | 'screen';
+  activity: Activity | 'screen';
   boss: boolean;
   /** 最近讀到的 HP 比例（-1 表示讀不到） */
   hp: number;
@@ -37,71 +37,52 @@ export interface Bot {
   readonly state: Readonly<BotState>;
 }
 
+/** 感知來源（皆可省略：省略即不啟用該行為），由 entrypoint 以畫面取樣實作 */
 export interface BotDeps {
   keyboard: Keyboard;
   now: () => number;
-  /** 掃描畫面上的傳送門；沒提供或回傳 null 時不做傳送門導航 */
   scanPortals?: () => PortalScan | null;
-  /** 辨識需要點擊的畫面（結算、確認框、初始技能）；沒提供時不處理 */
   detectScreen?: () => ScreenAction | null;
-  /** 找畫面外指示器（寶箱、任務、金波利、催眠師）；沒提供時不前往 */
   findIndicators?: () => Indicator[] | null;
-  /** 探測角色周圍的紅色預警框；沒提供時不躲 */
   probeDanger?: () => DangerProbes | null;
-  /** 催眠師螺旋太近時回傳遠離方向 */
   fleeSwirl?: () => Dir[] | null;
-  /** 讀 HP 條；沒提供時不做低血量行為 */
   readHp?: () => HpReading | null;
-  /** 是否在首領/MVP 戰（上方中央血條） */
   bossFight?: () => boolean;
   pointer?: Pointer;
   log?: Logger;
 }
 
-const SCAN_INTERVAL_MS = 250;
-const SCREEN_INTERVAL_MS = 500;
-const INDICATOR_INTERVAL_MS = 400;
-const DANGER_INTERVAL_MS = 150;
-const HP_INTERVAL_MS = 500;
-/** 低血量時的走位：大圈持續移動（週期為一般走位的 2.5 倍） */
-const RETREAT_PERIOD_FACTOR = 2.5;
-/** 首領戰風箏：大圈（2 倍週期）持續移動 */
-const KITE_PERIOD_FACTOR = 2;
+/** 各感知的取樣間隔 */
+const INTERVAL = { screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250 };
+/** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
+const RETREAT_FACTOR = 2.5;
+const KITE_FACTOR = 2;
 
 /**
- * 掛機主迴圈：
- * 1. 依走位策略持續按住方向鍵（只送差異，不重複 keydown）
- * 2. 週期送「1」處理升級選卡
- * 3. 畫面辨識處理視窗（結算、腐化寶箱、確認框…）、傳送門、指示器目標、紅框躲避
- * （自動 Enter 已移除：腐化寶箱預設焦點是 Hel、城鎮按 Enter 會開世界聊天，且用途已被畫面辨識取代）
- * 技能由遊戲自動施放，不需處理。
+ * 掛機主迴圈：感知（節流取樣）→ 視窗處理 → 移動決策（decide.ts，純函式）→ 按鍵。
+ * 技能由遊戲自動施放；升級卡另以週期送「1」當備援。
+ * （自動 Enter 已移除：腐化寶箱預設焦點是 Hel、城鎮按 Enter 會開世界聊天）
  */
-export function createBot(
-  cfg: BotConfig,
-  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, fleeSwirl, readHp, bossFight, pointer, log }: BotDeps,
-): Bot {
+export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
+  const { keyboard, now, pointer, log } = deps;
   let config = cfg;
-  let strategy: Strategy = createStrategy(cfg.mode, cfg);
-  let retreat: Strategy = circle(cfg.circlePeriodMs * RETREAT_PERIOD_FACTOR);
-  let kite: Strategy = circle(cfg.circlePeriodMs * KITE_PERIOD_FACTOR);
-  let boss = false;
+  const patterns = (c: BotConfig) => ({
+    patrol: createStrategy(c.mode, c),
+    retreat: circle(c.circlePeriodMs * RETREAT_FACTOR),
+    kite: circle(c.circlePeriodMs * KITE_FACTOR),
+  });
+  let moves: Record<'patrol' | 'retreat' | 'kite', Strategy> = patterns(cfg);
   let startedAt = now();
   let lastPick = -Infinity;
-  let lastScan = -Infinity;
-  let portalDirs: Dir[] | null = null;
-  const seeker = createPortalSeeker();
-  const screens = createScreenHandler();
-  const targetSeeker = createIndicatorSeeker();
-  let lastIndicatorScan = -Infinity;
-  let targetDirs: Dir[] | null = null;
-  let lastDangerProbe = -Infinity;
-  let probes: DangerProbes | null = null;
   let dodging = false;
-  let lastHpRead = -Infinity;
   let lowHp = false;
+  let boss = false;
+
+  const portalSeeker = createPortalSeeker();
+  const targetSeeker = createIndicatorSeeker();
+  const screens = createScreenHandler();
   const hpTracker = createHpTracker();
-  let lastScreenCheck = -Infinity;
-  let onScreen = false;
+
   const state: BotState = {
     running: false,
     activity: 'patrol',
@@ -116,21 +97,57 @@ export function createBot(
     picks: 0,
   };
 
+  // ---- 感知（節流）----
+  const sense = {
+    screen: throttle(INTERVAL.screen, () => (config.autoContinue && pointer ? deps.detectScreen?.() ?? null : null), null as ScreenAction | null),
+    portal: throttle(
+      INTERVAL.portal,
+      () => {
+        if (!config.portalSeek || !deps.scanPortals) return null;
+        const scan = deps.scanPortals();
+        if (!scan) return null;
+        state.scans++;
+        return portalSeeker.update(scan);
+      },
+      null as Dir[] | null,
+    ),
+    vitals: throttle(
+      INTERVAL.hp,
+      () => {
+        const hp = deps.readHp ? hpTracker.update(deps.readHp()) : null;
+        state.hp = hp ? Math.round(hp.ratio * 100) / 100 : -1;
+        const nowLow = hp !== null && (hp.low || hp.ratio < config.lowHpRatio);
+        if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
+        const nowBoss = config.bossKite && deps.bossFight ? deps.bossFight() : false;
+        if (nowBoss && !boss) log?.info('boss: 首領戰，改大圈風箏');
+        lowHp = nowLow;
+        boss = nowBoss;
+        state.boss = boss;
+        return { lowHp, boss };
+      },
+      { lowHp: false, boss: false },
+    ),
+    target: throttle(
+      INTERVAL.indicator,
+      () => (config.seekTargets && deps.findIndicators ? targetSeeker.update(deps.findIndicators(), now()) : null),
+      null as Dir[] | null,
+    ),
+    swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
+    danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
+  };
+
   return {
     state,
     update(next) {
-      if (next.mode !== config.mode || next.circlePeriodMs !== config.circlePeriodMs) {
-        strategy = createStrategy(next.mode, next);
-        retreat = circle(next.circlePeriodMs * RETREAT_PERIOD_FACTOR);
-        kite = circle(next.circlePeriodMs * KITE_PERIOD_FACTOR);
-      }
+      if (next.mode !== config.mode || next.circlePeriodMs !== config.circlePeriodMs) moves = patterns(next);
       if (next.enabled && !config.enabled) startedAt = now();
-      if (!next.portalSeek) portalDirs = null;
       if (!next.enabled && config.enabled) {
         keyboard.releaseAll();
         state.dirs = [];
       }
       config = next;
+      // 設定變更後重新取樣（例如關掉某功能要立即生效）
+      Object.values(sense).forEach((s) => s.reset());
       log?.debug('config', next);
     },
     tick() {
@@ -139,82 +156,36 @@ export function createBot(
       state.ticks++;
       const t = now();
 
-      if (config.autoContinue && detectScreen && pointer && t - lastScreenCheck >= SCREEN_INTERVAL_MS) {
-        lastScreenCheck = t;
-        const seen = detectScreen();
-        onScreen = seen !== null;
-        const act = screens.update(seen, t);
-        if (act) {
-          state.screenTaps++;
-          state.lastScreen = act.kind;
-          log?.info('screen: 點擊', act);
-          void pointer.tap(act.x, act.y);
-        }
+      // 視窗：辨識到就點擊並停止移動，等畫面切換
+      const seen = sense.screen.get(t);
+      // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
+      const act = sense.screen.fresh ? screens.update(seen, t) : null;
+      if (act && pointer) {
+        state.screenTaps++;
+        state.lastScreen = act.kind;
+        log?.info('screen: 點擊', act);
+        void pointer.tap(act.x, act.y);
       }
-      if (onScreen) {
-        // 停在視窗上：放開方向鍵，等畫面切換
+      if (seen) {
         for (const d of DIRS) keyboard.up(d);
         state.dirs = [];
         state.activity = 'screen';
         return;
       }
 
-      if (config.portalSeek && scanPortals && t - lastScan >= SCAN_INTERVAL_MS) {
-        lastScan = t;
-        const scan = scanPortals();
-        if (scan) {
-          state.scans++;
-          const next = seeker.update(scan);
-          if (next && !portalDirs) log?.info('portal: 看到返回地圖傳送門，開始導航', scan);
-          portalDirs = next;
-        }
-      }
-      if (readHp && t - lastHpRead >= HP_INTERVAL_MS) {
-        lastHpRead = t;
-        const hp = hpTracker.update(readHp());
-        state.hp = hp ? Math.round(hp.ratio * 100) / 100 : -1;
-        const nowLow = hp !== null && (hp.low || hp.ratio < config.lowHpRatio);
-        if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
-        lowHp = nowLow;
-        const nowBoss = config.bossKite && bossFight ? bossFight() : false;
-        if (nowBoss && !boss) log?.info('boss: 首領戰，改大圈風箏');
-        boss = nowBoss;
-        state.boss = boss;
-      }
-
-      if (!lowHp && !boss && !portalDirs && config.seekTargets && findIndicators && t - lastIndicatorScan >= INDICATOR_INTERVAL_MS) {
-        lastIndicatorScan = t;
-        const next = targetSeeker.update(findIndicators(), t);
-        if (next && !targetDirs) log?.info('target: 前往指示器目標');
-        targetDirs = next;
-      }
-      if (portalDirs || !config.seekTargets || lowHp || boss) targetDirs = null;
-      state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : lowHp ? 'retreat' : boss ? 'kite' : 'patrol';
+      const vitals = sense.vitals.get(t);
+      const portal = sense.portal.get(t);
+      const target = portal || vitals.lowHp || vitals.boss ? null : sense.target.get(t);
       const elapsed = t - startedAt;
-      const patrol = lowHp ? retreat(elapsed) : boss ? kite(elapsed) : strategy(elapsed);
-      let want = portalDirs ?? targetDirs ?? patrol;
-      if (!portalDirs && fleeSwirl && config.seekTargets) {
-        const away = fleeSwirl();
-        if (away) {
-          state.activity = 'flee';
-          want = away;
-        }
-      }
-      if (config.dodge && probeDanger) {
-        if (t - lastDangerProbe >= DANGER_INTERVAL_MS) {
-          lastDangerProbe = t;
-          probes = probeDanger();
-        }
-        const safer = probes ? dodge(probes, want) : null;
-        if (safer && !dodging) state.dodges++;
-        dodging = safer !== null;
-        if (safer) {
-          state.activity = 'dodge';
-          want = safer;
-        }
-      } else {
-        probes = null;
-      }
+      const { activity, want } = decide(
+        { portal, target, flee: sense.swirl.get(t), danger: sense.danger.get(t), ...vitals },
+        { patrol: moves.patrol(elapsed), retreat: moves.retreat(elapsed), kite: moves.kite(elapsed) },
+      );
+      if (activity === 'dodge' && !dodging) state.dodges++;
+      dodging = activity === 'dodge';
+      if (activity === 'target' && state.activity !== 'target') log?.info('target: 前往指示器目標');
+      state.activity = activity;
+
       for (const d of DIRS) {
         if (want.includes(d)) keyboard.down(d);
         else keyboard.up(d);

@@ -38,8 +38,9 @@ npm run build      # 產出 output/（有進版控，改完 code 記得 build �
 src/core/            純邏輯，不依賴 chrome.* API，可單獨測試
   input/keyboard     送合成 KeyboardEvent（帶 key / code / keyCode）
   movement/          走位策略（純函式：經過時間 → 方向鍵）
-  vision/            畫面辨識（canvas 取樣、MVP 傳送門）
-  bot/               掛機主迴圈
+  vision/            畫面辨識：layout.ts＋ui-rules.ts（版面結構解析與視窗判斷，優先）、screens.ts（舊顏色規則，備援）、
+                     portal / indicators / danger / hud（傳送門、畫面外指示器、紅框與催眠師、HP 與首領血條）
+  bot/               掛機主迴圈：bot.ts（感知→視窗→決策→按鍵）、decide.ts（移動優先順序，純函式）、throttle.ts（感知節流）
   spoof/mobile       iPhone 偽裝（UA、platform、maxTouchPoints、matchMedia）
   touch/             滑鼠 → 觸控事件
   background/        背景執行：接管 rAF + Worker 時脈
