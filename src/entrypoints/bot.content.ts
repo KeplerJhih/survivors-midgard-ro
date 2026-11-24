@@ -7,7 +7,8 @@ import { createLogger } from '@/core/log';
 import { GAME_MATCHES, isBridgeMessage, type BridgeMessage } from '@/core/messages';
 import { DEFAULT_SETTINGS, mergeSettings, type Settings } from '@/core/settings';
 import { installMouseToTouch } from '@/core/touch/mouse-to-touch';
-import { createCanvasSampler } from '@/core/vision/frame';
+import { createCanvasSampler, createCanvasSamplerByHeight } from '@/core/vision/frame';
+import { findObjects, SAMPLE_HEIGHT } from '@/core/vision/objects';
 import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
 import { parseLayout } from '@/core/vision/layout';
@@ -42,6 +43,7 @@ export default defineContentScript({
     const sampleHi = createCanvasSampler(canvas, 320);
     // UI 結構解析需要較高解析度（按鈕外框 1~2px）
     const sampleUI = createCanvasSampler(canvas, 640);
+    const sampleObj = createCanvasSamplerByHeight(canvas, SAMPLE_HEIGHT);
     const bot = createBot(settings.bot, {
       keyboard,
       now: () => performance.now(),
@@ -66,6 +68,10 @@ export default defineContentScript({
       fleeSwirl: () => {
         const frame = sample();
         return frame ? fleeSwirl(frame) : null;
+      },
+      findObjects: () => {
+        const frame = sampleObj();
+        return frame ? findObjects(frame, 0.8) : null;
       },
       bossFight: () => {
         const frame = sampleHi();

@@ -1,7 +1,7 @@
 import type { Dir } from '../movement/directions';
 import { dodge, type DangerProbes } from '../vision/danger';
 
-export type Activity = 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'kite' | 'flee';
+export type Activity = 'patrol' | 'portal' | 'target' | 'object' | 'dodge' | 'retreat' | 'kite' | 'flee';
 
 /** 本 tick 的感知結果（由 bot.ts 依節流取樣得來） */
 export interface Perception {
@@ -9,6 +9,8 @@ export interface Perception {
   portal: Dir[] | null;
   /** 走向指示器目標的方向 */
   target: Dir[] | null;
+  /** 走向畫面內物件（木箱/鐵箱）的方向 */
+  object?: Dir[] | null;
   /** 遠離催眠師螺旋的方向 */
   flee: Dir[] | null;
   danger: DangerProbes | null;
@@ -30,7 +32,7 @@ export interface Decision {
 /**
  * 移動決策（純函式）。優先順序：
  * 1. 傳送門（出口/城鎮）
- * 2. 指示器目標（低血量、首領戰時不追）
+ * 2. 指示器目標，其次畫面內物件（低血量、首領戰時都不追）
  * 3. 基本走位：低血量 → 大圈撤退；首領戰 → 大圈風箏；否則一般走位
  * 4. 催眠師螺旋太近 → 反方向逃（傳送門導航時不理）
  * 5. 紅色預警框 → 最後修正成安全方向
@@ -44,6 +46,9 @@ export function decide(p: Perception, pat: Patterns): Decision {
   } else if (p.target && !p.lowHp && !p.boss) {
     activity = 'target';
     want = p.target;
+  } else if (p.object && !p.lowHp && !p.boss) {
+    activity = 'object';
+    want = p.object;
   } else if (p.lowHp) {
     activity = 'retreat';
     want = pat.retreat;

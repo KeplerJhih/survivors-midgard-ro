@@ -70,3 +70,19 @@ export function createCanvasSampler(source: HTMLCanvasElement, width = 160): () 
     return ctx.getImageData(0, 0, width, height);
   };
 }
+
+/** 依固定「高度」取樣（寬度隨長寬比）：樣板比對需要與視窗高度成正比的世界縮放 */
+export function createCanvasSamplerByHeight(source: HTMLCanvasElement, height: number): () => Frame | null {
+  const off = document.createElement('canvas');
+  const ctx = off.getContext('2d', { willReadFrequently: true });
+  return () => {
+    if (!ctx || source.width === 0 || source.height === 0) return null;
+    const width = Math.max(1, Math.round((height * source.width) / source.height));
+    if (off.width !== width || off.height !== height) {
+      off.width = width;
+      off.height = height;
+    }
+    ctx.drawImage(source, 0, 0, width, height);
+    return ctx.getImageData(0, 0, width, height);
+  };
+}

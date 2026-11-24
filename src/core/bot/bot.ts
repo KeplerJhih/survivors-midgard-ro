@@ -9,6 +9,7 @@ import { createHpTracker, type HpReading } from '../vision/hud';
 import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
+import { createObjectSeeker, type ObjectHit } from '../vision/objects';
 import { decide, type Activity } from './decide';
 import { throttle } from './throttle';
 
@@ -48,12 +49,13 @@ export interface BotDeps {
   fleeSwirl?: () => Dir[] | null;
   readHp?: () => HpReading | null;
   bossFight?: () => boolean;
+  findObjects?: () => ObjectHit[] | null;
   pointer?: Pointer;
   log?: Logger;
 }
 
 /** 各感知的取樣間隔 */
-const INTERVAL = { screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250 };
+const INTERVAL = { screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600 };
 /** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
 const RETREAT_FACTOR = 2.5;
 const KITE_FACTOR = 2;
@@ -81,6 +83,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
+  const objectSeeker = createObjectSeeker();
   const screens = createScreenHandler();
   const hpTracker = createHpTracker();
 
@@ -133,6 +136,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       () => (config.seekTargets && deps.findIndicators ? targetSeeker.update(deps.findIndicators(), now()) : null),
       null as Dir[] | null,
     ),
+    object: throttle(
+      INTERVAL.object,
+      () => (config.seekObjects && deps.findObjects ? objectSeeker.update(deps.findObjects(), now()) : null),
+      null as Dir[] | null,
+    ),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
   };
@@ -178,10 +186,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
 
       const vitals = sense.vitals.get(t);
       const portal = sense.portal.get(t);
-      const target = portal || vitals.lowHp || vitals.boss ? null : sense.target.get(t);
+      const busy = portal || vitals.lowHp || vitals.boss;
+      const target = busy ? null : sense.target.get(t);
+      const object = busy || target ? null : sense.object.get(t);
       const elapsed = t - startedAt;
       const { activity, want } = decide(
-        { portal, target, flee: sense.swirl.get(t), danger: sense.danger.get(t), ...vitals },
+        { portal, target, object, flee: sense.swirl.get(t), danger: sense.danger.get(t), ...vitals },
         { patrol: moves.patrol(elapsed), retreat: moves.retreat(elapsed), kite: moves.kite(elapsed) },
       );
       if (activity === 'dodge' && !dodging) state.dodges++;

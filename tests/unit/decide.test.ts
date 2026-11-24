@@ -16,6 +16,12 @@ describe('decide（移動優先順序）', () => {
     expect(decide({ ...base, target: ['left'] }, pat).activity).toBe('target');
   });
 
+  it('物件排在指示器目標之後、一般走位之前', () => {
+    expect(decide({ ...base, object: ['right'] }, pat).activity).toBe('object');
+    expect(decide({ ...base, object: ['right'], target: ['left'] }, pat).activity).toBe('target');
+    expect(decide({ ...base, object: ['right'], lowHp: true }, pat).activity).toBe('retreat');
+  });
+
   it('低血量、首領戰時不追目標，改大圈', () => {
     expect(decide({ ...base, target: ['right'], lowHp: true }, pat)).toEqual({ activity: 'retreat', want: ['left'] });
     expect(decide({ ...base, target: ['right'], boss: true }, pat)).toEqual({ activity: 'kite', want: ['down'] });
