@@ -12,7 +12,7 @@ import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
 import { findIndicators } from '@/core/vision/indicators';
 import { fleeSwirl, probeDanger } from '@/core/vision/danger';
-import { readHp } from '@/core/vision/hud';
+import { bossFight, readHp } from '@/core/vision/hud';
 
 const TICK_MS = 50;
 
@@ -60,6 +60,10 @@ export default defineContentScript({
       fleeSwirl: () => {
         const frame = sample();
         return frame ? fleeSwirl(frame) : null;
+      },
+      bossFight: () => {
+        const frame = sampleHi();
+        return frame ? bossFight(frame) : false;
       },
       readHp: () => {
         const frame = sampleHi();
@@ -117,6 +121,7 @@ export default defineContentScript({
         screen: `${bot.state.lastScreen} ×${bot.state.screenTaps}`,
         dodges: bot.state.dodges,
         hp: bot.state.hp,
+        boss: bot.state.boss,
         picks: bot.state.picks,
         touch: removeTouch ? 'bridge' : '-',
       });

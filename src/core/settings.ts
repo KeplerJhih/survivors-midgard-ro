@@ -10,6 +10,8 @@ export interface BotConfig {
   portalSeek: boolean;
   /** 低血量時保命：HP 條變紅（< 25%）或低於此比例 → 不追目標、改大圈移動 */
   lowHpRatio: number;
+  /** 首領/MVP 戰：改大圈移動與 Boss 拉開距離、暫停追目標 */
+  bossKite: boolean;
   /** 辨識地面紅色預警框（MVP 技能範圍）自動躲開 */
   dodge: boolean;
   /** 以畫面外指示器自動前往寶箱、任務 NPC、金波利；避開催眠師 */
@@ -44,6 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
     seekTargets: true,
     dodge: true,
     lowHpRatio: 0.35,
+    bossKite: true,
     autoContinue: true,
   },
 };

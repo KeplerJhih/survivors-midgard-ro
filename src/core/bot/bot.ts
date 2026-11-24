@@ -16,7 +16,8 @@ const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 export interface BotState {
   running: boolean;
   /** patrol：一般走位；portal：正在走向返回地圖傳送門 */
-  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'flee' | 'screen';
+  activity: 'patrol' | 'portal' | 'target' | 'dodge' | 'retreat' | 'kite' | 'flee' | 'screen';
+  boss: boolean;
   /** 最近讀到的 HP 比例（-1 表示讀不到） */
   hp: number;
   dodges: number;
@@ -51,6 +52,8 @@ export interface BotDeps {
   fleeSwirl?: () => Dir[] | null;
   /** 讀 HP 條；沒提供時不做低血量行為 */
   readHp?: () => HpReading | null;
+  /** 是否在首領/MVP 戰（上方中央血條） */
+  bossFight?: () => boolean;
   pointer?: Pointer;
   log?: Logger;
 }
@@ -62,6 +65,8 @@ const DANGER_INTERVAL_MS = 150;
 const HP_INTERVAL_MS = 500;
 /** 低血量時的走位：大圈持續移動（週期為一般走位的 2.5 倍） */
 const RETREAT_PERIOD_FACTOR = 2.5;
+/** 首領戰風箏：大圈（2 倍週期）持續移動 */
+const KITE_PERIOD_FACTOR = 2;
 
 /**
  * 掛機主迴圈：
@@ -73,11 +78,13 @@ const RETREAT_PERIOD_FACTOR = 2.5;
  */
 export function createBot(
   cfg: BotConfig,
-  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, fleeSwirl, readHp, pointer, log }: BotDeps,
+  { keyboard, now, scanPortals, detectScreen, findIndicators, probeDanger, fleeSwirl, readHp, bossFight, pointer, log }: BotDeps,
 ): Bot {
   let config = cfg;
   let strategy: Strategy = createStrategy(cfg.mode, cfg);
   let retreat: Strategy = circle(cfg.circlePeriodMs * RETREAT_PERIOD_FACTOR);
+  let kite: Strategy = circle(cfg.circlePeriodMs * KITE_PERIOD_FACTOR);
+  let boss = false;
   let startedAt = now();
   let lastPick = -Infinity;
   let lastScan = -Infinity;
@@ -101,6 +108,7 @@ export function createBot(
     lastScreen: '-',
     dodges: 0,
     hp: -1,
+    boss: false,
     screenTaps: 0,
     dirs: [],
     scans: 0,
@@ -114,6 +122,7 @@ export function createBot(
       if (next.mode !== config.mode || next.circlePeriodMs !== config.circlePeriodMs) {
         strategy = createStrategy(next.mode, next);
         retreat = circle(next.circlePeriodMs * RETREAT_PERIOD_FACTOR);
+        kite = circle(next.circlePeriodMs * KITE_PERIOD_FACTOR);
       }
       if (next.enabled && !config.enabled) startedAt = now();
       if (!next.portalSeek) portalDirs = null;
@@ -167,17 +176,22 @@ export function createBot(
         const nowLow = hp !== null && (hp.low || hp.ratio < config.lowHpRatio);
         if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
         lowHp = nowLow;
+        const nowBoss = config.bossKite && bossFight ? bossFight() : false;
+        if (nowBoss && !boss) log?.info('boss: 首領戰，改大圈風箏');
+        boss = nowBoss;
+        state.boss = boss;
       }
 
-      if (!lowHp && !portalDirs && config.seekTargets && findIndicators && t - lastIndicatorScan >= INDICATOR_INTERVAL_MS) {
+      if (!lowHp && !boss && !portalDirs && config.seekTargets && findIndicators && t - lastIndicatorScan >= INDICATOR_INTERVAL_MS) {
         lastIndicatorScan = t;
         const next = targetSeeker.update(findIndicators(), t);
         if (next && !targetDirs) log?.info('target: 前往指示器目標');
         targetDirs = next;
       }
-      if (portalDirs || !config.seekTargets || lowHp) targetDirs = null;
-      state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : lowHp ? 'retreat' : 'patrol';
-      const patrol = lowHp ? retreat(t - startedAt) : strategy(t - startedAt);
+      if (portalDirs || !config.seekTargets || lowHp || boss) targetDirs = null;
+      state.activity = portalDirs ? 'portal' : targetDirs ? 'target' : lowHp ? 'retreat' : boss ? 'kite' : 'patrol';
+      const elapsed = t - startedAt;
+      const patrol = lowHp ? retreat(elapsed) : boss ? kite(elapsed) : strategy(elapsed);
       let want = portalDirs ?? targetDirs ?? patrol;
       if (!portalDirs && fleeSwirl && config.seekTargets) {
         const away = fleeSwirl();

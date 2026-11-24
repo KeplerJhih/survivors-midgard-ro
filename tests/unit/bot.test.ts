@@ -130,5 +130,25 @@ describe('bot', () => {
     expect(bot.state.activity).toBe('retreat');
     expect(bot.state.hp).toBeCloseTo(0.2);
   });
+
+  it('首領戰：不追目標、改大圈風箏', () => {
+    let t = 0;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        readHp: () => ({ fill: 20, low: false }),
+        bossFight: () => true,
+        findIndicators: () => [{ kind: 'target', x: 0, y: -0.3, icon: [255, 218, 112], size: 0.05 }],
+      },
+    );
+    bot.tick();
+    t += 500;
+    bot.tick();
+    expect(bot.state.boss).toBe(true);
+    expect(bot.state.activity).toBe('kite');
+  });
 });
 

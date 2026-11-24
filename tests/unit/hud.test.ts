@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '@/core/vision/frame';
-import { createHpTracker, readHp } from '@/core/vision/hud';
+import { bossFight, createHpTracker, readHp } from '@/core/vision/hud';
 
 const W = 320;
 const H = 224;
@@ -35,5 +35,15 @@ describe('createHpTracker', () => {
     expect(t.update({ fill: 20, low: false })!.ratio).toBe(1);
     expect(t.update({ fill: 7, low: false })!.ratio).toBeCloseTo(0.35);
     expect(t.update({ fill: 4, low: true })).toEqual({ ratio: 0.2, low: true });
+  });
+});
+
+describe('bossFight', () => {
+  it('上方中央有首領粉紅血條 → true；沒有 → false', () => {
+    const f = frame(20);
+    expect(bossFight(f)).toBe(false);
+    const d = f.data as Uint8ClampedArray;
+    for (let y = 8; y < 11; y++) for (let x = 123; x < 197; x++) d.set([237, 107, 140, 255], (y * W + x) * 4);
+    expect(bossFight(f)).toBe(true);
   });
 });

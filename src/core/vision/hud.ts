@@ -64,3 +64,21 @@ export function createHpTracker(): HpTracker {
     },
   };
 }
+
+/**
+ * 首領 / MVP 戰：畫面上方中央的血條面板（「首領 · X」「MVP · X」）。
+ * 實機取樣（2026-11-25，Baphomet）：血條粉紅 (237,107,140)，位於 y≈0.04H、x 0.38~0.62W；320px 寬約 220 點。
+ */
+const BOSS_BAR: [number, number, number] = [237, 107, 140];
+
+export function bossFight(f: Frame): boolean {
+  const { width: W, height: H, data } = f;
+  let n = 0;
+  for (let y = 0; y < Math.ceil(0.1 * H); y++) {
+    for (let x = Math.floor(0.3 * W); x < Math.ceil(0.7 * W); x++) {
+      const i = (y * W + x) * 4;
+      if (near(data[i]!, data[i + 1]!, data[i + 2]!, BOSS_BAR, 35)) n++;
+    }
+  }
+  return n >= W * H * 0.0015;
+}
