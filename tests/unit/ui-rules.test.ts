@@ -200,6 +200,16 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeLessThan(0.55);
   });
 
+  it('寶箱視窗：小「繼續」被文字切碎 → 點面板底部中線的殘片', () => {
+    const f = draw(GRASS, [
+      { x0: 0.26, y0: 0.26, x1: 0.74, y1: 0.74, fill: PANEL },
+      { x0: 0.485, y0: 0.68, x1: 0.515, y1: 0.725, fill: BTN, border: [90, 110, 200] },
+    ]);
+    const a = decide(f)!;
+    expect(a.x).toBeCloseTo(0.5, 1);
+    expect(a.y).toBeGreaterThan(0.66);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },

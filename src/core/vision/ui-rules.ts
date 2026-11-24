@@ -155,7 +155,39 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   // 選項格（初始技能等）：同一大區塊內 ≥2 個等大、無按鈕的面板 → 點「與眾不同」的那張（上次選擇有不同色帶），否則第一張
   const grid = optionGrid(f, regions, buttons);
   if (grid) return tap('start-skill', grid);
+  // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
+  const frag = bottomFragment(regions, buttons);
+  if (frag) return tap('modal', frag);
   return null;
+}
+
+/**
+ * 實機：寶箱視窗的「繼續」只有兩個字，按鈕內部被文字切成小塊（寬 2.8%、高 3.5%），不像按鈕。
+ * 條件：置中大面板（面積 15~50%、填滿率 ≥ 0.8）內沒有偵測到按鈕；面板底部 15% 內、靠近中線（±10%）有小亮塊。
+ */
+function bottomFragment(regions: Region[], buttons: Region[]): Region | null {
+  const panel = regions.find(
+    (r) =>
+      r.kind === 'panel' &&
+      Math.abs(cx(r) - 0.5) < 0.06 &&
+      Math.abs(cy(r) - 0.5) < 0.12 &&
+      rw(r) * rh(r) >= 0.15 &&
+      rw(r) * rh(r) <= 0.5 &&
+      r.fill >= 0.8,
+  );
+  if (!panel || buttons.some((b) => inside(b, panel, 0.01))) return null;
+  return (
+    regions
+      .filter(
+        (r) =>
+          r !== panel &&
+          inside(r, panel, 0.01) &&
+          cy(r) >= panel.y1 - 0.15 * rh(panel) &&
+          Math.abs(cx(r) - cx(panel)) < 0.1 &&
+          rw(r) * rh(r) < 0.01,
+      )
+      .sort((a, b) => cy(b) - cy(a))[0] ?? null
+  );
 }
 
 /**
