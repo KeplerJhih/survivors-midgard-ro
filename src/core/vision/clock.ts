@@ -4,6 +4,8 @@ import type { Frame } from './frame';
  * 遊戲時間是否停住：讀右上小地圖面板的「時間 mm:ss」數字字形（深色像素），比對前後是否相同。
  * 面板半透明，整塊亮度會隨背後畫面浮動（實測時間停住時平均差仍有 1~5），只比字形（亮度 < 90）才穩定：
  * 實機 MVP 戰中時間停在 08:00，4 秒內字形 XOR 皆為 0（56 個字形像素）。
+ * 背景是深色岩石時，背後畫面會透過半透明面板混進「字形」（81~85 點、每秒 XOR 1~8）→
+ * 門檻收緊到亮度 < 75，容許差異改為字形點數的 10%（秒數換一個數字約翻轉 20 點）。
  * 用途：MVP 入口傳送門開啟時時間會停住並等角色走進去（core/mvp_raid.gd state 'portal'）。
  */
 export const CLOCK_REGION = { x0: 0.885, x1: 0.935, y0: 0.175, y1: 0.2 };
@@ -18,7 +20,7 @@ export function clockGlyph(f: Frame): Uint8Array {
   for (let y = Y0; y < Y1; y++) {
     for (let x = X0; x < X1; x++) {
       const i = (y * f.width + x) * 4;
-      out[k++] = 0.299 * f.data[i]! + 0.587 * f.data[i + 1]! + 0.114 * f.data[i + 2]! < 90 ? 1 : 0;
+      out[k++] = 0.299 * f.data[i]! + 0.587 * f.data[i + 1]! + 0.114 * f.data[i + 2]! < 75 ? 1 : 0;
     }
   }
   return out;
@@ -29,7 +31,7 @@ export interface FreezeDetector {
   update(glyph: Uint8Array | null, now: number): boolean;
 }
 
-export function createFreezeDetector(freezeMs = 3000, minPixels = 20, tolerance = 2): FreezeDetector {
+export function createFreezeDetector(freezeMs = 3000, minPixels = 20, tolerance = 0.1): FreezeDetector {
   let prev: Uint8Array | null = null;
   let since = -1;
   return {
@@ -43,7 +45,7 @@ export function createFreezeDetector(freezeMs = 3000, minPixels = 20, tolerance 
       let diff = 0;
       for (let i = 0; i < g.length; i++) diff += g[i]! ^ prev[i]!;
       prev = g;
-      if (diff > tolerance) {
+      if (diff > Math.max(3, on * tolerance)) {
         since = -1;
         return false;
       }

@@ -14,6 +14,17 @@ describe('createFreezeDetector', () => {
     expect(d.update(glyph(1), 5000)).toBe(false);
   });
 
+  it('背景透出造成少量雜訊（< 10%）仍判定停住', () => {
+    const d = createFreezeDetector(2000);
+    const g = glyph(0);
+    const noisy = Uint8Array.from(g);
+    noisy[1] = noisy[1]! ^ 1;
+    noisy[2] = noisy[2]! ^ 1;
+    d.update(g, 0);
+    d.update(noisy, 1000);
+    expect(d.update(g, 3000)).toBe(true);
+  });
+
   it('字形太少（讀不到時鐘）不判定', () => {
     const d = createFreezeDetector(1000);
     const empty = new Uint8Array(300);
