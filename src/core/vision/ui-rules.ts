@@ -9,7 +9,7 @@ import type { ScreenAction } from './screens';
  * - 初始技能：卡片頂端有「上次選擇」小色帶 → 點那張；沒有就點第一張
  * - 升級：一排 2~4 張卡（無按鈕）→ 稀有度最高（稀有度本身由外框色表示，僅此處比較顏色）
  * - 結算：近全寬面板，最下排 4 顆按鈕 [選擇目的地][再玩一次][前往城鎮][更換職業] → 第 2 顆
- * - 確認框：小面板，最下排 2 顆按鈕 → 最右（[要再想想][仍要離開]、[離開遊戲][留下] 最右皆安全）
+ * - 確認框/對話：非全寬面板，最下排 2 顆按鈕 → 最右（[要再想想][仍要離開]、[離開遊戲][留下]、任務 [先不要][我來幫忙！] 最右皆為想要的）
  * - 置中單一寬按鈕（新卡片/暫停選單「繼續」）→ 點它（必須先於「最寬按鈕」，暫停選單最下排有「放棄本局」）
  * - 選地圖/準備：最下排有明顯最寬的按鈕（選擇、出發冒險）→ 點它
  */
@@ -85,19 +85,27 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
 
   // ---- 按鈕列 ----
   const buttonRows = rows(buttons);
-  const bottom = buttonRows.filter((g) => g.length >= 2).sort((a, b) => cy(b[0]!) - cy(a[0]!))[0];
+  // 按鈕排所屬的面板：按鈕都在面板左右範圍內，且排位於面板內或緊貼其下方（≤ 8%）
   const container = (row: Region[]) =>
     panels
-      .filter((p) => row.every((b) => b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02) && cy(row[0]!) > p.y0)
+      .filter(
+        (p) =>
+          row.every((b) => b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02) && cy(row[0]!) > p.y0 && cy(row[0]!) <= p.y1 + 0.08,
+      )
       .sort((a, b) => rw(a) * rh(a) - rw(b) * rh(b))[0];
+  // 只看屬於某個面板的按鈕排（排除畫面底部 HUD 的「已保留寶箱 [開啟]」等），取最下面那排
+  const bottom = buttonRows
+    .filter((g) => g.length >= 2 && container(g))
+    .sort((a, b) => cy(b[0]!) - cy(a[0]!))[0];
 
   if (bottom && bottom.length === 4) {
     const p = container(bottom);
     if (p && rw(p) >= 0.8) return tap('result', bottom[1]!);
   }
   if (bottom && bottom.length === 2) {
+    // 不限置中：任務 NPC 視窗在左側（[先不要][我來幫忙！]）
     const p = container(bottom);
-    if (p && rw(p) * rh(p) < 0.15 && Math.abs(cx(p) - 0.5) < 0.12) return tap('dialog', bottom[1]!);
+    if (p && rw(p) < 0.8) return tap('dialog', bottom[1]!);
   }
   // 置中單一寬按鈕（獨自一排）
   const wide = buttonRows
