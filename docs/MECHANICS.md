@@ -39,6 +39,7 @@
 | 升級選卡 | 單人會暫停 | 週期送 `1`；或勾遊戲內「隨機選卡」（`endless_auto_pick`，**每局重設**） |
 | 寶箱 | 會暫停 | 勾遊戲內「累積寶箱」（`hold_chests`，**永久設定**）→ 不跳窗、物品直接入帳、Tab 查看 |
 | 官方「隨機選卡」開啟時 | — | 寶箱視窗也會整個跳過（`core/main.gd` `if menus.auto_pick: return`） |
+| MVP 入口傳送門開啟 | 一般怪被清空、計時停止 | 生成在角色 4~6.5 單位外的隨機方向，**沒有時限，不踩進去就一直卡著**（`core/mvp_raid.gd` `open_portal`、`_portal_point`）。顏色隨 MVP 不同（`GameData.RAIDS[*].color`，綠/橙/紫/金都有）→ 不適合用顏色找，改用花瓣走位掃過 |
 | MVP 戰 | 不暫停，計時停止 | 打完後出現傳送門，**不走進去就永遠停在 MVP 房**（`core/mvp_raid.gd` state `won`） |
 | 轉職 / 結算 | 會停 | 預設焦點按鈕，Enter 觸發 |
 | 腐化寶箱（選路線） | 會停 | 每張地圖第一次會跳窗；選過後同地圖自動沿用（`world.corrupt_auto`，換地圖重設）。⚠️ **預設焦點是 Hel**，按 Enter 會選 Hel |

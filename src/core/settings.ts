@@ -32,7 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   debug: false,
   bot: {
     enabled: false,
-    mode: 'figure8',
+    mode: 'flower',
     circlePeriodMs: 4000,
     pickIntervalMs: 1500,
     enterEnabled: false,

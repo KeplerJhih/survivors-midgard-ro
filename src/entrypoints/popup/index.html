@@ -33,13 +33,14 @@
       <label><input type="checkbox" data-key="bot.enabled" /> 啟用掛機</label>
       <label>走位
         <select data-key="bot.mode">
-          <option value="figure8">8 字形（範圍大，撿較多東西）</option>
+          <option value="flower">花瓣（掃過整片圓盤，會踩到 MVP 入口）</option>
+          <option value="figure8">8 字形（上下兩圓）</option>
           <option value="circle">繞圈（範圍小）</option>
           <option value="none">原地不動</option>
         </select>
       </label>
       <label>走位週期 (ms) <input type="number" min="1000" step="500" data-key="bot.circlePeriodMs" /></label>
-      <div class="hint">越大繞得越大；8 字形每圈都用這個週期</div>
+      <div class="hint">單圈時間，越大繞得越大（花瓣掃描半徑約為單圈的 2 倍）</div>
       <label>選卡間隔 (ms) <input type="number" min="500" step="100" data-key="bot.pickIntervalMs" /></label>
       <label><input type="checkbox" data-key="bot.portalSeek" /> MVP 後自動走回地圖</label>
       <div class="hint">畫面辨識「返回地圖」傳送門，避開紅色傳送門</div>

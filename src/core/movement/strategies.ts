@@ -3,7 +3,7 @@ import { dirsFromAngle, TAU, type Dir } from './directions';
 /** 走位策略：給定已經過的毫秒數，回傳此刻要按住的方向鍵。純函式，方便測試。 */
 export type Strategy = (elapsedMs: number) => Dir[];
 
-export type MoveMode = 'none' | 'circle' | 'figure8';
+export type MoveMode = 'none' | 'circle' | 'figure8' | 'flower';
 
 export interface MoveOptions {
   /** 繞一圈的時間 */
@@ -32,12 +32,33 @@ export function figure8(periodMs: number): Strategy {
   };
 }
 
+/** 黃金角：連續圈的出發方向不重複、分布最均勻 */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/**
+ * 花瓣：每圈都是從起點出發、回到起點的圓，但每圈的出發方向轉一個黃金角（137.5°）。
+ * 所有經過起點的圓會掃過半徑 2R 的整個圓盤（R 為單圈半徑）：
+ * - MVP 入口傳送門生成在角色 4~6.5 單位外、隨機方向，且一直等到角色踩進去
+ *   （core/mvp_raid.gd _portal_point / state 'portal'）→ 掃過圓盤就會踩到
+ * - 範圍內的掉落物也會被經過（磁吸半徑 4）
+ * 每圈都是完整的圓，淨位移為 0，不會漂走。
+ */
+export function flower(periodMs: number): Strategy {
+  return (t) => {
+    const lap = Math.floor(t / periodMs);
+    const a = ((t % periodMs) / periodMs) * TAU;
+    return dirsFromAngle(lap * GOLDEN_ANGLE + a);
+  };
+}
+
 export function createStrategy(mode: MoveMode, opts: MoveOptions): Strategy {
   switch (mode) {
     case 'circle':
       return circle(opts.circlePeriodMs);
     case 'figure8':
       return figure8(opts.circlePeriodMs);
+    case 'flower':
+      return flower(opts.circlePeriodMs);
     case 'none':
       return none;
   }
