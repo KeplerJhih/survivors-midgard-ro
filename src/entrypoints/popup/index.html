@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>Midgard Survivors Helper</title>
+    <style>
+      body { width: 280px; margin: 0; padding: 12px; font: 13px/1.5 system-ui, sans-serif; color: #1d2433; }
+      h1 { font-size: 14px; margin: 0 0 8px; }
+      fieldset { border: 1px solid #d5dae5; border-radius: 6px; margin: 0 0 10px; padding: 6px 10px; }
+      legend { font-weight: 600; padding: 0 4px; }
+      label { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+      .hint { font-size: 11px; color: #6b7487; margin: 2px 0 4px 22px; }
+      .warn { color: #b3541e; }
+      select, input[type='number'] { margin-left: auto; width: 96px; }
+      #status { font-size: 11px; color: #2f7a3e; min-height: 1.5em; }
+    </style>
+  </head>
+  <body>
+    <h1>Midgard Survivors Helper</h1>
+
+    <fieldset>
+      <legend>頁面（改完需重新整理遊戲頁）</legend>
+      <label><input type="checkbox" data-key="mobile" /> 模擬 iPhone</label>
+      <label><input type="checkbox" data-key="touchBridge" /> 滑鼠拖曳轉觸控</label>
+      <div class="hint">模擬手機時，用滑鼠操作虛擬搖桿</div>
+      <label><input type="checkbox" data-key="background" /> 背景持續執行</label>
+      <div class="hint">切到其他分頁時遊戲不會停</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>掛機（即時生效）</legend>
+      <label><input type="checkbox" data-key="bot.enabled" /> 啟用掛機</label>
+      <label>走位
+        <select data-key="bot.mode">
+          <option value="circle">繞圈</option>
+          <option value="none">原地不動</option>
+        </select>
+      </label>
+      <label>繞圈週期 (ms) <input type="number" min="1000" step="500" data-key="bot.circlePeriodMs" /></label>
+      <label>選卡間隔 (ms) <input type="number" min="500" step="100" data-key="bot.pickIntervalMs" /></label>
+      <label><input type="checkbox" data-key="bot.enterEnabled" /> 自動按 Enter</label>
+      <div class="hint warn">⚠️ 在城鎮按 Enter 會開世界聊天，只在對局中使用</div>
+    </fieldset>
+
+    <label><input type="checkbox" data-key="debug" /> Debug 面板與 log</label>
+    <div id="status"></div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
