@@ -108,7 +108,6 @@ export default defineContentScript({
         screen: `${bot.state.lastScreen} ×${bot.state.screenTaps}`,
         dodges: bot.state.dodges,
         picks: bot.state.picks,
-        enters: bot.state.enters,
         touch: removeTouch ? 'bridge' : '-',
       });
     });

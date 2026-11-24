@@ -10,10 +10,13 @@ import type { Frame } from './frame';
  * - 初始技能：「上次選擇」卡片頂端是 LEGENDARY_COLOR (0.85,0.42,0.05) 色帶（ui/menus.gd show_start_skill）
  * - 腐化寶箱選路線：左卡 Hel 標題粉紅 (247,224,224)、右卡 Valhalla 標題淡藍 (222,235,255)，
  *   按鈕「選擇這條路」在卡片底部；預設焦點在 Hel，所以只能點擊（karma.gd chest_choice、menus.gd）
+ * - 選地圖（城鎮踩「出發冒險！」傳送門後，menus.show_server_select）：左側世界地圖、右側淺色面板
+ *   （右 38% 區域淺色約 51%、全畫面約 20%），右下「選擇 ▶」為主要按鈕（約 y=0.825H）；上一張地圖預設已選
+ * - 「準備」畫面：置中大面板，右下「出發冒險！」為主要按鈕 → 由置中視窗規則處理
  * - 「新卡片！」等置中視窗：淺色面板（實機約畫面 37%×61%，密度 0.72），底部「繼續」為主要按鈕（藍框，
  *   縮圖後只剩上緣一條線）；背景不壓暗。升級選卡視窗不使用 UiKit 主要按鈕，不會被誤點
  */
-export type ScreenKind = 'result' | 'corrupt' | 'modal' | 'dialog' | 'start-skill';
+export type ScreenKind = 'result' | 'corrupt' | 'map-select' | 'modal' | 'dialog' | 'start-skill';
 
 export interface ScreenAction {
   kind: ScreenKind;
@@ -112,6 +115,15 @@ export function detectScreen(f: Frame): ScreenAction | null {
       x: (val.minX + val.maxX + 1) / 2 / W,
       y: (card.maxY + 1) / H - 0.04,
     };
+  }
+
+  // 選地圖：右側淺色面板，點面板右下的主要按鈕「選擇」（沿用預設選中的地圖）
+  const right = scan(f, isLight, { x0: 0.62, x1: 1, y0: 0.15, y1: 0.9 });
+  if (light < 0.35 && right.n / (0.38 * W * 0.75 * H) >= 0.4) {
+    const p = scan(f, isPrimaryBorder, { x0: 0.62, x1: 1, y0: 0.75, y1: 0.92 });
+    if (p.n >= 4) {
+      return { kind: 'map-select', x: (p.minX + p.maxX + 1) / 2 / W, y: (p.minY + 0.5) / H + 0.015 };
+    }
   }
 
   // 置中的淺色視窗，下半部有主要按鈕（新卡片「繼續」等）→ 點主要按鈕（藍框上緣往下一點才在按鈕內）

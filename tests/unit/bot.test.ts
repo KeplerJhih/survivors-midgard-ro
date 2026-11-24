@@ -14,7 +14,7 @@ function setup(overrides: Partial<BotConfig> = {}, scan?: () => PortalScan | nul
   const keyboard = createKeyboard(target, { sleep: async () => {} });
   const cfg: BotConfig = { ...DEFAULT_SETTINGS.bot, mode: 'circle', ...overrides };
   const bot = createBot(cfg, { keyboard, now: () => t, scanPortals: scan });
-  const heldDirs = () => [...keyboard.held()].filter((k) => k !== 'pick1' && k !== 'enter');
+  const heldDirs = () => [...keyboard.held()].filter((k) => k !== 'pick1');
   return { bot, keyboard, heldDirs, sent, advance: (ms: number) => (t += ms), cfg };
 }
 
@@ -48,18 +48,6 @@ describe('bot', () => {
       advance(100);
     }
     expect(bot.state.picks).toBe(2); // t=0, t=1500
-  });
-
-  it('Enter 預設關閉', () => {
-    const { bot, sent } = setup({ enabled: true });
-    bot.tick();
-    expect(sent.some((s) => s.endsWith(':Enter'))).toBe(false);
-  });
-
-  it('enterEnabled 時依間隔送 Enter', () => {
-    const { bot, sent } = setup({ enabled: true, enterEnabled: true });
-    bot.tick();
-    expect(sent).toContain('keydown:Enter');
   });
 
   it('停用時放開所有按鍵', () => {
@@ -116,31 +104,4 @@ describe('bot', () => {
     bot.tick();
     expect(taps).toEqual([[0.4, 0.95]]);
   });
-
-  it('有畫面辨識時，Enter 只在連續兩次檢查都沒有視窗後、且剛檢查完的那個 tick 才送', () => {
-    let t = 0;
-    const sent: string[] = [];
-    const target = new EventTarget();
-    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
-    const keyboard = createKeyboard(target, { sleep: async () => {} });
-    let screen: { kind: 'corrupt'; x: number; y: number } | null = null;
-    const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'none', enterEnabled: true, enterIntervalMs: 100 },
-      { keyboard, now: () => t, detectScreen: () => screen, pointer: { tap: async () => {} } },
-    );
-    bot.tick(); // 第 1 次檢查（無視窗）
-    expect(sent).not.toContain('Enter');
-    t += 500;
-    bot.tick(); // 第 2 次檢查（無視窗）→ 可送
-    expect(sent).toContain('Enter');
-
-    sent.length = 0;
-    screen = { kind: 'corrupt', x: 0.6, y: 0.8 };
-    t += 500;
-    bot.tick(); // 偵測到腐化寶箱 → 不送 Enter
-    t += 500;
-    bot.tick();
-    expect(sent).not.toContain('Enter');
-  });
 });
-

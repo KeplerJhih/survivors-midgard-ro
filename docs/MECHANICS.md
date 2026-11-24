@@ -66,6 +66,12 @@
 - 沒存進 Kafra 就離開會跳「不存放就離開？」確認框：[要再想想][仍要離開]，背景加 55% 遮罩（`_end_leave`）。
 - 新局開始跳「選擇你的初始技能」，上次選的卡片頂端有 LEGENDARY_COLOR 色帶與「上次選擇」（`show_start_skill`）；不吃數字鍵。
 
+## 城鎮出發
+
+- Prontera 城鎮有「出發冒險！」傳送門（淡藍 Color(0.55,0.75,1.0)，`core/town.gd` `_build_portal`）；踩上去（PORTAL_RANGE 內）→ 選地圖（`show_server_select`）。
+- 選地圖：左世界地圖、右面板預選上一張地圖，右下「選擇 ▶」→ 「準備」畫面，右下「出發冒險！」→ 載入 → 新局。
+- 城鎮按 Enter 會開世界聊天（`core/town_crowd.gd`）；離開遊戲確認框 [離開][留下] 的右下是「留下」。
+
 ## 地圖 NPC
 
 | NPC | 生成 | 互動 | 建議 |

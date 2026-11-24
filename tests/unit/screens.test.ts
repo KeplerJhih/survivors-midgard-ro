@@ -55,6 +55,18 @@ describe('detectScreen', () => {
     expect(a.y).toBeLessThan(0.88);
   });
 
+  it('選地圖：右側面板，點右下的「選擇」', () => {
+    const f = paint([60, 80, 50], [
+      { x0: 0.62, y0: 0.17, x1: 0.99, y1: 0.86, rgb: PANEL },
+      { x0: 0.87, y0: 0.805, x1: 0.98, y1: 0.812, rgb: BLUE_BORDER },
+    ]);
+    const a = detectScreen(f)!;
+    expect(a.kind).toBe('map-select');
+    expect(a.x).toBeGreaterThan(0.87);
+    expect(a.y).toBeGreaterThan(0.81);
+    expect(a.y).toBeLessThan(0.86);
+  });
+
   it('新卡片等置中視窗（背景不壓暗）：點底部主要按鈕「繼續」', () => {
     const f = paint(GRASS, [
       { x0: 0.31, y0: 0.2, x1: 0.68, y1: 0.82, rgb: PANEL },

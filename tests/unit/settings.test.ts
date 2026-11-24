@@ -14,8 +14,7 @@ describe('mergeSettings', () => {
     expect(s.bot.pickIntervalMs).toBe(DEFAULT_SETTINGS.bot.pickIntervalMs);
   });
 
-  it('預設不啟用掛機、不自動按 Enter', () => {
+  it('預設不啟用掛機', () => {
     expect(DEFAULT_SETTINGS.bot.enabled).toBe(false);
-    expect(DEFAULT_SETTINGS.bot.enterEnabled).toBe(false);
   });
 });

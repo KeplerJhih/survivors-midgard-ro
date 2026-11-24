@@ -23,7 +23,6 @@ export interface BotState {
   scans: number;
   ticks: number;
   picks: number;
-  enters: number;
 }
 
 export interface Bot {
@@ -57,7 +56,8 @@ const DANGER_INTERVAL_MS = 150;
  * 掛機主迴圈：
  * 1. 依走位策略持續按住方向鍵（只送差異，不重複 keydown）
  * 2. 週期送「1」處理升級選卡
- * 3. （選用）週期送 Enter 處理寶箱/結算
+ * 3. 畫面辨識處理視窗（結算、腐化寶箱、確認框…）、傳送門、指示器目標、紅框躲避
+ * （自動 Enter 已移除：腐化寶箱預設焦點是 Hel、城鎮按 Enter 會開世界聊天，且用途已被畫面辨識取代）
  * 技能由遊戲自動施放，不需處理。
  */
 export function createBot(
@@ -68,7 +68,6 @@ export function createBot(
   let strategy: Strategy = createStrategy(cfg.mode, cfg);
   let startedAt = now();
   let lastPick = -Infinity;
-  let lastEnter = -Infinity;
   let lastScan = -Infinity;
   let portalDirs: Dir[] | null = null;
   const seeker = createPortalSeeker();
@@ -81,9 +80,6 @@ export function createBot(
   let dodging = false;
   let lastScreenCheck = -Infinity;
   let onScreen = false;
-  /** 連續幾次畫面檢查都沒有視窗（Enter 只在畫面穩定時送，避免在腐化寶箱選到預設焦點 Hel） */
-  let clearChecks = 0;
-  let checkedThisTick = false;
   const state: BotState = {
     running: false,
     activity: 'patrol',
@@ -94,7 +90,6 @@ export function createBot(
     scans: 0,
     ticks: 0,
     picks: 0,
-    enters: 0,
   };
 
   return {
@@ -118,13 +113,10 @@ export function createBot(
       state.ticks++;
       const t = now();
 
-      checkedThisTick = false;
       if (config.autoContinue && detectScreen && pointer && t - lastScreenCheck >= SCREEN_INTERVAL_MS) {
         lastScreenCheck = t;
-        checkedThisTick = true;
         const seen = detectScreen();
         onScreen = seen !== null;
-        clearChecks = onScreen ? 0 : clearChecks + 1;
         const act = screens.update(seen, t);
         if (act) {
           state.screenTaps++;
@@ -185,12 +177,6 @@ export function createBot(
         lastPick = t;
         state.picks++;
         void keyboard.tap('pick1');
-      }
-      const screenSafe = !(config.autoContinue && detectScreen && pointer) || (checkedThisTick && clearChecks >= 2);
-      if (config.enterEnabled && screenSafe && t - lastEnter >= config.enterIntervalMs) {
-        lastEnter = t;
-        state.enters++;
-        void keyboard.tap('enter');
       }
     },
   };
