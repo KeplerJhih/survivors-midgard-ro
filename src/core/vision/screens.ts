@@ -19,7 +19,7 @@ import type { Frame } from './frame';
  * - 「新卡片！」等置中視窗：淺色面板（實機約畫面 37%×61%，密度 0.72），底部「繼續」為主要按鈕（藍框，
  *   縮圖後只剩上緣一條線）；背景不壓暗。升級選卡視窗不使用 UiKit 主要按鈕，不會被誤點
  */
-export type ScreenKind = 'result' | 'corrupt' | 'level-up' | 'map-select' | 'modal' | 'dialog' | 'start-skill';
+export type ScreenKind = 'result' | 'corrupt' | 'level-up' | 'map-select' | 'modal' | 'dialog' | 'start-skill' | 'pause';
 
 /** 稀有度由高到低（進化 > 傳說 > 史詩 > 稀有） */
 export const RARITY_BORDERS: { name: string; rgb: [number, number, number] }[] = [

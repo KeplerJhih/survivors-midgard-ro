@@ -180,9 +180,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const t = now();
 
       // 視窗：辨識到就點擊並停止移動，等畫面切換
-      const seen = sense.screen.get(t);
+      // 同步遊戲設定中：暫停選單由同步模組操作，畫面辨識不插手（否則會被保險規則點「繼續」關掉）
+      const seen = deps.gameSync?.busy ? null : sense.screen.get(t);
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
-      const act = sense.screen.fresh ? screens.update(seen, t) : null;
+      const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       if (act && pointer) {
         state.screenTaps++;
         state.lastScreen = act.kind;

@@ -71,8 +71,12 @@ export default defineContentScript({
         if (!frame) return null;
         // 結構判斷優先；舊顏色規則只保留特徵獨特的「結算頁」「腐化寶箱」
         // （實機：城鎮明亮石板地讓舊「初始技能」規則把屋頂當成色帶、在城鎮亂點）
-        const structural = decideByLayout(frame, parseLayout(frame));
+        const regions = parseLayout(frame);
+        const structural = decideByLayout(frame, regions);
         if (structural) return structural;
+        // 保險：停在暫停選單（同步失敗、誤按 Esc）→ 點「繼續」（同步中 bot 不會呼叫這裡）
+        const pause = readPauseMenu(frame, regions);
+        if (pause) return { kind: 'pause', ...pause.resume };
         const legacy = detectScreen(frame);
         return legacy && (legacy.kind === 'result' || legacy.kind === 'corrupt') ? legacy : null;
       },

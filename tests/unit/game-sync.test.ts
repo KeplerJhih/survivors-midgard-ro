@@ -91,3 +91,14 @@ describe('readPauseMenu', () => {
     expect(readPauseMenu(frame([false, false, false]), [])).toBeNull();
   });
 });
+
+describe('createGameSync 失敗處理', () => {
+  it('讀不到選單時不再盲按 Esc（避免反而把選單打開）', () => {
+    const keyboard = { tap: vi.fn(async () => {}) } as never;
+    const pointer = { tap: vi.fn(async () => {}) } as never;
+    const sync = createGameSync({ keyboard, pointer, read: () => null, desired: () => ({ autoPick: 'on', holdLevels: 'keep', holdChests: 'keep' }) });
+    run(sync, 5000, 8000);
+    expect((keyboard as unknown as { tap: { mock: { calls: unknown[] } } }).tap.mock.calls).toHaveLength(1);
+    expect(sync.busy).toBe(false);
+  });
+});

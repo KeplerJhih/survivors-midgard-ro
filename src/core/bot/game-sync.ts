@@ -74,8 +74,8 @@ export function createGameSync({ keyboard, pointer, read, desired, log }: GameSy
       if (phase === 'adjusting') {
         if (!menu) {
           if (now - phaseAt > 2000) {
-            // 讀不到：可能沒打開或不是暫停選單 → 按 Esc 關掉（若有開）並結束
-            void keyboard.tap('escape');
+            // 讀不到：不盲按 Esc（第一次沒打開時再按反而會打開，實機曾因此停在暫停選單）；
+            // 若選單其實開著，交給畫面辨識的暫停選單保險規則點「繼續」
             finish(now, false);
           }
           return true;
