@@ -17,8 +17,13 @@ export interface Blob {
   h: number;
 }
 
-/** 找出所有符合條件像素的重心與外框；少於 minCount 視為沒有 */
-export function findBlob(frame: Frame, match: PixelMatch, minCount = 1): Blob | null {
+/** 找出所有符合條件像素的重心與外框；少於 minCount 視為沒有。include 可排除特定位置（例如角色周圍） */
+export function findBlob(
+  frame: Frame,
+  match: PixelMatch,
+  minCount = 1,
+  include: (x: number, y: number) => boolean = () => true,
+): Blob | null {
   const { width, height, data } = frame;
   let n = 0;
   let sx = 0;
@@ -30,7 +35,7 @@ export function findBlob(frame: Frame, match: PixelMatch, minCount = 1): Blob | 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
-      if (!match(data[i]!, data[i + 1]!, data[i + 2]!)) continue;
+      if (!match(data[i]!, data[i + 1]!, data[i + 2]!) || !include(x, y)) continue;
       n++;
       sx += x;
       sy += y;

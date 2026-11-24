@@ -81,6 +81,9 @@ export function createBot(
   let dodging = false;
   let lastScreenCheck = -Infinity;
   let onScreen = false;
+  /** 連續幾次畫面檢查都沒有視窗（Enter 只在畫面穩定時送，避免在腐化寶箱選到預設焦點 Hel） */
+  let clearChecks = 0;
+  let checkedThisTick = false;
   const state: BotState = {
     running: false,
     activity: 'patrol',
@@ -115,10 +118,13 @@ export function createBot(
       state.ticks++;
       const t = now();
 
+      checkedThisTick = false;
       if (config.autoContinue && detectScreen && pointer && t - lastScreenCheck >= SCREEN_INTERVAL_MS) {
         lastScreenCheck = t;
+        checkedThisTick = true;
         const seen = detectScreen();
         onScreen = seen !== null;
+        clearChecks = onScreen ? 0 : clearChecks + 1;
         const act = screens.update(seen, t);
         if (act) {
           state.screenTaps++;
@@ -180,7 +186,8 @@ export function createBot(
         state.picks++;
         void keyboard.tap('pick1');
       }
-      if (config.enterEnabled && t - lastEnter >= config.enterIntervalMs) {
+      const screenSafe = !(config.autoContinue && detectScreen && pointer) || (checkedThisTick && clearChecks >= 2);
+      if (config.enterEnabled && screenSafe && t - lastEnter >= config.enterIntervalMs) {
         lastEnter = t;
         state.enters++;
         void keyboard.tap('enter');

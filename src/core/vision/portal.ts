@@ -19,13 +19,21 @@ export interface PortalScan {
 
 /** 160px 寬的畫面上，傳送門至少要這麼多點、且外框不能太大（排除全螢幕閃光） */
 const MIN_EXIT_POINTS = 8;
-const MAX_BLOB_SIZE = 0.3;
+/**
+ * 實機誤判（2026-11-25 野外）：Charge Attack 等技能在角色身邊產生青白光 (191,255,247)、(203,255,251)，
+ * 最多 52 點、外框約 0.14W，連續 3 次就被當成出口 → 排除角色周圍、並收緊外框上限。
+ * 傳送門光暈約 60px（0.06W）。真的出口離角色這麼近時角色已快踩到，排除不影響。
+ */
+const MAX_BLOB_SIZE = 0.12;
+const PLAYER_EXCLUDE = 0.1;
 
 export function scanPortals(frame: Frame): PortalScan {
+  const { width: W, height: H } = frame;
+  const away = (x: number, y: number) => Math.hypot(x - W / 2, y - H / 2) > PLAYER_EXCLUDE * W;
   const compact = (b: Blob | null) => (b && b.w <= MAX_BLOB_SIZE && b.h <= MAX_BLOB_SIZE ? b : null);
   return {
-    exit: compact(findBlob(frame, isExitColor, MIN_EXIT_POINTS)),
-    danger: compact(findBlob(frame, isDangerColor, MIN_EXIT_POINTS)),
+    exit: compact(findBlob(frame, isExitColor, MIN_EXIT_POINTS, away)),
+    danger: compact(findBlob(frame, isDangerColor, MIN_EXIT_POINTS, away)),
   };
 }
 

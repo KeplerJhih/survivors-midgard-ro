@@ -116,5 +116,31 @@ describe('bot', () => {
     bot.tick();
     expect(taps).toEqual([[0.4, 0.95]]);
   });
+
+  it('有畫面辨識時，Enter 只在連續兩次檢查都沒有視窗後、且剛檢查完的那個 tick 才送', () => {
+    let t = 0;
+    const sent: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    let screen: { kind: 'corrupt'; x: number; y: number } | null = null;
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'none', enterEnabled: true, enterIntervalMs: 100 },
+      { keyboard, now: () => t, detectScreen: () => screen, pointer: { tap: async () => {} } },
+    );
+    bot.tick(); // 第 1 次檢查（無視窗）
+    expect(sent).not.toContain('Enter');
+    t += 500;
+    bot.tick(); // 第 2 次檢查（無視窗）→ 可送
+    expect(sent).toContain('Enter');
+
+    sent.length = 0;
+    screen = { kind: 'corrupt', x: 0.6, y: 0.8 };
+    t += 500;
+    bot.tick(); // 偵測到腐化寶箱 → 不送 Enter
+    t += 500;
+    bot.tick();
+    expect(sent).not.toContain('Enter');
+  });
 });
 

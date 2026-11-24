@@ -41,9 +41,14 @@ describe('scanPortals', () => {
     expect(scanPortals(frame([])).exit).toBeNull();
   });
 
+  it('角色身邊的技能青光不算出口（實機誤判）', () => {
+    expect(scanPortals(frame([{ at: [80, 56], size: 10, rgb: EXIT }])).exit).toBeNull();
+  });
+
   it('太少點（特效雜訊）或太大（全螢幕閃光）都不算', () => {
     expect(scanPortals(frame([{ at: [40, 40], size: 2, rgb: EXIT }])).exit).toBeNull();
     expect(scanPortals(frame([{ at: [80, 56], size: 100, rgb: EXIT }])).exit).toBeNull();
+    expect(scanPortals(frame([{ at: [40, 30], size: 24, rgb: EXIT }])).exit).toBeNull(); // 外框 0.15W
   });
 });
 
