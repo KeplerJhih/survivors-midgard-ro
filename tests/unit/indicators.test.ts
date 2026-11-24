@@ -105,6 +105,15 @@ describe('createIndicatorSeeker', () => {
     expect(s.update(list, 400)).toEqual(['right']);
   });
 
+  it('指示器消失（目標進入畫面）後沿最後方向滑行 2.5 秒', () => {
+    const s = createIndicatorSeeker(2, 30000, 20000, 2500);
+    s.update(list, 0);
+    s.update(list, 400);
+    expect(s.update([], 800)).toEqual(['right']);
+    expect(s.update([], 3000)).toEqual(['right']);
+    expect(s.update([], 3400)).toBeNull();
+  });
+
   it('追超過時限就放棄並冷卻', () => {
     const s = createIndicatorSeeker(2, 30000, 20000);
     s.update(list, 0);

@@ -138,22 +138,41 @@ export interface IndicatorSeeker {
   readonly seeking: boolean;
 }
 
-/** 連續 confirm 次看到目標才前往；追超過 maxChaseMs 就放棄並冷卻 cooldownMs（走不到/卡地形時） */
-export function createIndicatorSeeker(confirm = 2, maxChaseMs = 30000, cooldownMs = 20000): IndicatorSeeker {
+/**
+ * 連續 confirm 次看到目標才前往；追超過 maxChaseMs 就放棄並冷卻 cooldownMs（走不到/卡地形時）。
+ * 指示器消失＝目標已進入畫面（離得不遠）→ 沿最後方向再走 coastMs，走到觸發/吸取範圍（任務 2.6、寶箱 3 單位）。
+ */
+export function createIndicatorSeeker(
+  confirm = 2,
+  maxChaseMs = 30000,
+  cooldownMs = 20000,
+  coastMs = 2500,
+): IndicatorSeeker {
   let seen = 0;
   let chaseStart = -1;
   let coolUntil = -Infinity;
   let seeking = false;
+  let lastDirs: Dir[] | null = null;
+  let coastUntil = -Infinity;
   return {
     get seeking() {
       return seeking;
     },
     update(list, now) {
       const dirs = list ? steerToIndicator(list) : null;
+      if (!dirs && seeking && lastDirs && now >= coolUntil) {
+        // 剛失去指示器：開始滑行
+        coastUntil = now + coastMs;
+        seeking = false;
+        seen = 0;
+        chaseStart = -1;
+      }
+      if (!dirs && now < coastUntil && lastDirs) return lastDirs;
       if (!dirs || now < coolUntil) {
         seen = 0;
         chaseStart = -1;
         seeking = false;
+        lastDirs = null;
         return null;
       }
       seen++;
@@ -167,6 +186,7 @@ export function createIndicatorSeeker(confirm = 2, maxChaseMs = 30000, cooldownM
         return null;
       }
       seeking = true;
+      lastDirs = dirs;
       return dirs;
     },
   };
