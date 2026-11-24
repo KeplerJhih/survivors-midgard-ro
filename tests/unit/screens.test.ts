@@ -39,6 +39,18 @@ describe('detectScreen', () => {
     expect(a.y).toBeCloseTo(0.95, 1);
   });
 
+  it('新卡片等置中視窗（背景不壓暗）：點底部主要按鈕「繼續」', () => {
+    const f = paint(GRASS, [
+      { x0: 0.31, y0: 0.2, x1: 0.68, y1: 0.82, rgb: PANEL },
+      { x0: 0.33, y0: 0.768, x1: 0.66, y1: 0.776, rgb: BLUE_BORDER }, // 縮圖後只剩上緣
+    ]);
+    const a = detectScreen(f)!;
+    expect(a.kind).toBe('modal');
+    expect(a.x).toBeCloseTo(0.495, 1);
+    expect(a.y).toBeGreaterThan(0.776);
+    expect(a.y).toBeLessThan(0.82);
+  });
+
   it('確認框：背景被壓暗、中央亮色視窗 → 點右下角（實機約占畫面 27%×11%）', () => {
     const f = paint(SHADE, [{ x0: 0.36, y0: 0.44, x1: 0.64, y1: 0.56, rgb: PANEL }]);
     const a = detectScreen(f)!;

@@ -8,8 +8,10 @@ import type { Frame } from './frame';
  * - 「不存放就離開？」確認框：背景加 55% 遮罩變暗，中央亮色小視窗，按鈕靠右 [要再想想][仍要離開]
  *   （ui/menus.gd _end_leave）
  * - 初始技能：「上次選擇」卡片頂端是 LEGENDARY_COLOR (0.85,0.42,0.05) 色帶（ui/menus.gd show_start_skill）
+ * - 「新卡片！」等置中視窗：淺色面板（實機約畫面 37%×61%，密度 0.72），底部「繼續」為主要按鈕（藍框，
+ *   縮圖後只剩上緣一條線）；背景不壓暗。升級選卡視窗不使用 UiKit 主要按鈕，不會被誤點
  */
-export type ScreenKind = 'result' | 'dialog' | 'start-skill';
+export type ScreenKind = 'result' | 'modal' | 'dialog' | 'start-skill';
 
 export interface ScreenAction {
   kind: ScreenKind;
@@ -90,6 +92,31 @@ export function detectScreen(f: Frame): ScreenAction | null {
         x: (primary.maxX + 0.6 * bw) / W,
         y: (primary.minY + primary.maxY + 1) / 2 / H,
       };
+    }
+  }
+
+  // 置中的淺色視窗，下半部有主要按鈕（新卡片「繼續」等）→ 點主要按鈕（藍框上緣往下一點才在按鈕內）
+  const modal = scan(f, isLight, { x0: 0.15, x1: 0.85, y0: 0.1, y1: 0.9 });
+  if (modal.n > 0) {
+    const bw = modal.maxX - modal.minX + 1;
+    const bh = modal.maxY - modal.minY + 1;
+    const cx = (modal.minX + modal.maxX + 1) / 2 / W;
+    const density = modal.n / (bw * bh);
+    const area = (bw * bh) / (W * H);
+    if (density >= 0.55 && area >= 0.08 && Math.abs(cx - 0.5) < 0.12) {
+      const primary = scan(f, isPrimaryBorder, {
+        x0: modal.minX / W,
+        x1: (modal.maxX + 1) / W,
+        y0: (modal.minY + 0.6 * bh) / H,
+        y1: (modal.maxY + 1) / H,
+      });
+      if (primary.n >= 4) {
+        return {
+          kind: 'modal',
+          x: (primary.minX + primary.maxX + 1) / 2 / W,
+          y: (primary.minY + 0.5) / H + 0.02,
+        };
+      }
     }
   }
 
