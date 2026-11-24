@@ -104,6 +104,19 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeCloseTo(0.645, 1);
   });
 
+  it('底部 HUD 的寬條（已保留寶箱 [開啟]）不當成寬按鈕', () => {
+    const f = draw(GRASS, [{ x0: 0.42, y0: 0.86, x1: 0.67, y1: 0.93, fill: BTN }]);
+    expect(decide(f)).toBeNull();
+  });
+
+  it('沒有大面板包住的「卡片列」（技能白光）不當成升級', () => {
+    const f = draw(GRASS, [
+      { x0: 0.2, y0: 0.25, x1: 0.39, y1: 0.73, fill: PANEL, border: [77, 140, 255] },
+      { x0: 0.41, y0: 0.25, x1: 0.59, y1: 0.73, fill: PANEL },
+    ]);
+    expect(decide(f)).toBeNull();
+  });
+
   it('首領戰：上方中央的血條面板不當成寬按鈕', () => {
     const f = draw(GRASS, [
       { x0: 0.34, y0: 0.0, x1: 0.66, y1: 0.12, fill: PANEL },

@@ -98,10 +98,11 @@ describe('bot', () => {
       },
     );
     bot.tick();
-    expect(bot.state.activity).toBe('screen');
-    expect([...keyboard.held()].filter((k) => k !== 'pick1')).toEqual([]);
+    expect(bot.state.activity).not.toBe('screen'); // 單次偵測不停下
     t += 500;
     bot.tick();
+    expect(bot.state.activity).toBe('screen');
+    expect([...keyboard.held()].filter((k) => k !== 'pick1')).toEqual([]);
     expect(taps).toEqual([[0.4, 0.95]]);
   });
 

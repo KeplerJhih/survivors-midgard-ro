@@ -73,8 +73,12 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   }
 
   // ---- 卡片列 ----
+  // 卡片列必須被一個大區塊包住（升級視窗）：MVP 戰的技能白光、左側 MVP 技能面板曾被誤判成卡片。
+  // 不限種類：卡片佔掉面板大部分面積，面板填滿率低時會被歸為 other
+  const bigPanels = regions.filter((r) => rw(r) * rh(r) >= 0.2);
   const cardRow = rows(cards, 0.05, 0.12)
     .filter((g) => g.length >= 2 && g.length <= 4)
+    .filter((g) => bigPanels.some((p) => g.every((c) => inside(c, p, 0.03))))
     .sort((a, b) => b.length - a.length)[0];
   if (cardRow) {
     const ranks = cardRow.map((c) => rarity(borderColor(f, c)));
@@ -111,8 +115,12 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   const wide = buttonRows
     .filter((g) => g.length === 1)
     .map((g) => g[0]!)
-    // 必須在畫面 30% 以下：實機誤判上方首領血條面板為寬按鈕，首領戰中停下亂點
+    // 必須在畫面 30% 以下（上方首領血條面板曾被誤判），且位於某個較大面板的下半部
+    // （底部 HUD「已保留 N 個寶箱 [開啟]」曾被誤判）
     .filter((b) => rw(b) >= 0.2 && Math.abs(cx(b) - 0.5) < 0.1 && cy(b) >= 0.3)
+    .filter((b) =>
+      panels.some((p) => rw(p) * rh(p) >= 0.05 && rw(p) > rw(b) && b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02 && cy(b) > cy(p) && cy(b) <= p.y1 + 0.05),
+    )
     .sort((a, b) => cy(b) - cy(a))[0];
   if (wide) return tap('modal', wide);
   // 最下排明顯最寬的按鈕

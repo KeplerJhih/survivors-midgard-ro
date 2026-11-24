@@ -77,6 +77,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let dodging = false;
   let lowHp = false;
   let boss = false;
+  let screenStreak = 0;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -166,7 +167,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         log?.info('screen: 點擊', act);
         void pointer.tap(act.x, act.y);
       }
-      if (seen) {
+      if (sense.screen.fresh) screenStreak = seen ? screenStreak + 1 : 0;
+      // 連續 2 次取樣都看到視窗才停止移動（單張誤判不該讓角色在戰鬥中停下；真的視窗遊戲本來就暫停）
+      if (seen && screenStreak >= 2) {
         for (const d of DIRS) keyboard.up(d);
         state.dirs = [];
         state.activity = 'screen';
