@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '@/core/vision/frame';
-import { createScreenHandler, detectScreen, lightRatio } from '@/core/vision/screens';
+import { createScreenHandler, detectScreen, lightRatio, pickRarestCard } from '@/core/vision/screens';
 
 type RGB = [number, number, number];
 const W = 160;
@@ -112,6 +112,38 @@ describe('detectScreen', () => {
   it('沒被壓暗的畫面中央出現亮色（技能閃光）不當成確認框', () => {
     const f = paint(GRASS, [{ x0: 0.38, y0: 0.4, x1: 0.62, y1: 0.6, rgb: PANEL }]);
     expect(detectScreen(f)).toBeNull();
+  });
+});
+
+/** 升級視窗：白底面板＋三張卡（外框色＝稀有度） */
+function levelUp(borders: RGB[]): Frame {
+  const rects: { x0: number; y0: number; x1: number; y1: number; rgb: RGB }[] = [
+    { x0: 0.18, y0: 0.2, x1: 0.82, y1: 0.8, rgb: PANEL },
+  ];
+  borders.forEach((rgb, k) => {
+    const x0 = 0.2 + k * 0.2;
+    rects.push({ x0, y0: 0.26, x1: x0 + 0.18, y1: 0.72, rgb }); // 外框
+    rects.push({ x0: x0 + 0.01, y0: 0.27, x1: x0 + 0.17, y1: 0.71, rgb: PANEL }); // 卡身
+  });
+  return paint(GRASS, rects);
+}
+const COMMON: RGB = [189, 201, 230];
+const RARE: RGB = [77, 140, 255];
+const EPIC: RGB = [179, 89, 242];
+
+describe('pickRarestCard', () => {
+  it('點稀有度最高的卡（史詩在第 3 張）', () => {
+    const p = pickRarestCard(levelUp([RARE, COMMON, EPIC]))!;
+    expect(p.rarity).toBe('epic');
+    expect(p.x).toBeCloseTo(0.69, 1);
+  });
+
+  it('都是普通卡時不處理（交給「1」）', () => {
+    expect(pickRarestCard(levelUp([COMMON, COMMON, COMMON]))).toBeNull();
+  });
+
+  it('detectScreen 回傳 level-up 動作', () => {
+    expect(detectScreen(levelUp([COMMON, RARE, COMMON]))!.kind).toBe('level-up');
   });
 });
 

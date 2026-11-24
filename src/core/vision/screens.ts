@@ -10,13 +10,24 @@ import type { Frame } from './frame';
  * - 初始技能：「上次選擇」卡片頂端是 LEGENDARY_COLOR (0.85,0.42,0.05) 色帶（ui/menus.gd show_start_skill）
  * - 腐化寶箱選路線：左卡 Hel 標題粉紅 (247,224,224)、右卡 Valhalla 標題淡藍 (222,235,255)，
  *   按鈕「選擇這條路」在卡片底部；預設焦點在 Hel，所以只能點擊（karma.gd chest_choice、menus.gd）
+ * - 升級選卡：卡片外框色＝稀有度（ui/menus.gd _rarity_frame、GameData.CHOICE_RARITY）：
+ *   稀有 (77,140,255)、史詩 (179,89,242)、傳說 (255,173,38)、進化 LEGENDARY_COLOR (217,107,13)；普通為淡灰藍。
+ *   遊戲內「隨機選擇」每局會被重設（實機：新局後變回未勾），故由外掛依稀有度點卡；全是普通卡時交給週期送的「1」
  * - 選地圖（城鎮踩「出發冒險！」傳送門後，menus.show_server_select）：左側世界地圖、右側淺色面板
  *   （右 38% 區域淺色約 51%、全畫面約 20%），右下「選擇 ▶」為主要按鈕（約 y=0.825H）；上一張地圖預設已選
  * - 「準備」畫面：置中大面板，右下「出發冒險！」為主要按鈕 → 由置中視窗規則處理
  * - 「新卡片！」等置中視窗：淺色面板（實機約畫面 37%×61%，密度 0.72），底部「繼續」為主要按鈕（藍框，
  *   縮圖後只剩上緣一條線）；背景不壓暗。升級選卡視窗不使用 UiKit 主要按鈕，不會被誤點
  */
-export type ScreenKind = 'result' | 'corrupt' | 'map-select' | 'modal' | 'dialog' | 'start-skill';
+export type ScreenKind = 'result' | 'corrupt' | 'level-up' | 'map-select' | 'modal' | 'dialog' | 'start-skill';
+
+/** 稀有度由高到低（進化 > 傳說 > 史詩 > 稀有） */
+export const RARITY_BORDERS: { name: string; rgb: [number, number, number] }[] = [
+  { name: 'evolve', rgb: [217, 107, 13] },
+  { name: 'legendary', rgb: [255, 173, 38] },
+  { name: 'epic', rgb: [179, 89, 242] },
+  { name: 'rare', rgb: [77, 140, 255] },
+];
 
 export interface ScreenAction {
   kind: ScreenKind;
@@ -117,6 +128,12 @@ export function detectScreen(f: Frame): ScreenAction | null {
     };
   }
 
+  // 升級選卡：點稀有度最高的卡（同稀有度多張時取像素最多那張）
+  if (light >= 0.15) {
+    const pick = pickRarestCard(f);
+    if (pick) return { kind: 'level-up', ...pick };
+  }
+
   // 選地圖：右側淺色面板，點面板右下的主要按鈕「選擇」（沿用預設選中的地圖）
   const right = scan(f, isLight, { x0: 0.62, x1: 1, y0: 0.15, y1: 0.9 });
   if (light < 0.35 && right.n / (0.38 * W * 0.75 * H) >= 0.4) {
@@ -178,6 +195,48 @@ export function detectScreen(f: Frame): ScreenAction | null {
         return { kind: 'dialog', x: (box.minX + 0.9 * bw) / W, y: (box.minY + 0.8 * bh) / H };
       }
     }
+  }
+  return null;
+}
+
+/** 在升級視窗範圍內找各稀有度外框，依 x 間隔分成一張張卡，回傳最高稀有度那張卡的中心 */
+export function pickRarestCard(f: Frame): { x: number; y: number; rarity: string } | null {
+  const W = f.width;
+  const H = f.height;
+  const minPixels = Math.max(6, W * H * 0.0008);
+  for (const { name, rgb } of RARITY_BORDERS) {
+    const pts: [number, number][] = [];
+    for (let y = Math.floor(0.12 * H); y < Math.ceil(0.85 * H); y++) {
+      for (let x = Math.floor(0.1 * W); x < Math.ceil(0.9 * W); x++) {
+        const i = (y * W + x) * 4;
+        const dr = f.data[i]! - rgb[0];
+        const dg = f.data[i + 1]! - rgb[1];
+        const db = f.data[i + 2]! - rgb[2];
+        if (dr * dr + dg * dg + db * db <= 45 * 45) pts.push([x, y]);
+      }
+    }
+    if (pts.length < minPixels) continue;
+    // 依 x 排序，間隔 > 2% 寬就是不同張卡
+    pts.sort((a, b) => a[0] - b[0]);
+    const cards: [number, number][][] = [[]];
+    for (let k = 0; k < pts.length; k++) {
+      if (k > 0 && pts[k]![0] - pts[k - 1]![0] > 0.02 * W) cards.push([]);
+      cards[cards.length - 1]!.push(pts[k]!);
+    }
+    // 卡片外框是高的矩形；扁的同色區塊（例如初始技能「上次選擇」色帶，與進化色相同）不算
+    const tall = cards.filter((c) => {
+      const ys = c.map((p) => p[1]);
+      return c.length >= minPixels && Math.max(...ys) - Math.min(...ys) >= 0.15 * H;
+    });
+    if (tall.length === 0) continue;
+    const best = tall.reduce((a, b) => (b.length > a.length ? b : a));
+    const xs = best.map((p) => p[0]);
+    const ys = best.map((p) => p[1]);
+    return {
+      x: (Math.min(...xs) + Math.max(...xs) + 1) / 2 / W,
+      y: (Math.min(...ys) + Math.max(...ys) + 1) / 2 / H,
+      rarity: name,
+    };
   }
   return null;
 }
