@@ -9,7 +9,7 @@ import { createLogger } from '@/core/log';
 import { GAME_MATCHES, isBridgeMessage, type BridgeMessage } from '@/core/messages';
 import { DEFAULT_SETTINGS, mergeSettings, type Settings } from '@/core/settings';
 import { installMouseToTouch } from '@/core/touch/mouse-to-touch';
-import { createCanvasSampler, createCanvasSamplerByHeight } from '@/core/vision/frame';
+import { createCanvasSampler, createCanvasSamplerByHeight, createCropSampler } from '@/core/vision/frame';
 import { findObjects, SAMPLE_HEIGHT } from '@/core/vision/objects';
 import { scanPortals } from '@/core/vision/portal';
 import { detectScreen } from '@/core/vision/screens';
@@ -19,6 +19,7 @@ import { findIndicators } from '@/core/vision/indicators';
 import { approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { textBands } from '@/core/vision/clock';
 import { bossBar, readHp } from '@/core/vision/hud';
+import { MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
 
 const TICK_MS = 50;
 
@@ -47,6 +48,7 @@ export default defineContentScript({
     // UI 結構解析需要較高解析度（按鈕外框 1~2px）
     const sampleUI = createCanvasSampler(canvas, 640);
     const sampleObj = createCanvasSamplerByHeight(canvas, SAMPLE_HEIGHT);
+    const sampleMinimap = createCropSampler(canvas, MINIMAP_REGION);
     const pointer = createPointer(canvas, () => /iPhone/.test(navigator.userAgent));
     const gameSync = createGameSync({
       keyboard,
@@ -103,6 +105,10 @@ export default defineContentScript({
       findObjects: () => {
         const frame = sampleObj();
         return frame ? findObjects(frame, 0.8) : null;
+      },
+      readMinimap: () => {
+        const frame = sampleMinimap();
+        return frame ? readMinimap(frame) : null;
       },
       bossBar: () => {
         const frame = sampleHi();

@@ -153,3 +153,32 @@ describe('bot', () => {
   });
 });
 
+
+describe('首領血條久不下降 → 依小地圖走向首領', () => {
+  it('校正後往首領點走（activity target）', () => {
+    let t = 0;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    // 對應：按右 → 小地圖 +x、按上 → 小地圖 -y（一般地圖方向）；玩家依按住方向移動
+    let p = { x: 100, y: 100 };
+    let held: string[] = [];
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'wander' },
+      {
+        keyboard,
+        now: () => t,
+        bossBar: () => 0.003,
+        readMinimap: () => ({ player: { ...p }, boss: { x: -500, y: 100 } }),
+      },
+    );
+    for (; t < 40000; t += 100) {
+      bot.tick();
+      held = bot.state.dirs;
+      p = {
+        x: p.x + ((held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0)) * 0.3,
+        y: p.y - ((held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0)) * 0.3,
+      };
+    }
+    expect(bot.state.activity).toBe('target');
+    expect(bot.state.dirs).toEqual(['left']);
+  });
+});

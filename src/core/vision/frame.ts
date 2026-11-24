@@ -86,3 +86,25 @@ export function createCanvasSamplerByHeight(source: HTMLCanvasElement, height: n
     return ctx.getImageData(0, 0, width, height);
   };
 }
+
+/** 以原生解析度取畫面的一塊區域（比例座標）：小地圖上的點只有幾個像素，縮小取樣會消失 */
+export function createCropSampler(
+  source: HTMLCanvasElement,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+): () => Frame | null {
+  const off = document.createElement('canvas');
+  const ctx = off.getContext('2d', { willReadFrequently: true });
+  return () => {
+    if (!ctx || source.width === 0 || source.height === 0) return null;
+    const sx = Math.round(rect.x0 * source.width);
+    const sy = Math.round(rect.y0 * source.height);
+    const w = Math.max(1, Math.round(rect.x1 * source.width) - sx);
+    const h = Math.max(1, Math.round(rect.y1 * source.height) - sy);
+    if (off.width !== w || off.height !== h) {
+      off.width = w;
+      off.height = h;
+    }
+    ctx.drawImage(source, sx, sy, w, h, 0, 0, w, h);
+    return ctx.getImageData(0, 0, w, h);
+  };
+}

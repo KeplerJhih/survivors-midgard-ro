@@ -11,6 +11,7 @@ import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
 import { createClockTracker, type TextBand } from '../vision/clock';
+import { createMinimapNavigator, type MinimapRead } from '../vision/minimap';
 import { decide, type Activity } from './decide';
 import type { GameSync } from './game-sync';
 import { throttle } from './throttle';
@@ -52,6 +53,8 @@ export interface BotDeps {
   probeDanger?: () => DangerProbes | null;
   fleeSwirl?: () => Dir[] | null;
   readHp?: () => HpReading | null;
+  /** 小地圖（玩家箭頭、首領點） */
+  readMinimap?: () => MinimapRead | null;
   /** 首領血條剩餘量（0＝沒有首領戰） */
   bossBar?: () => number;
   findObjects?: () => ObjectHit[] | null;
@@ -66,7 +69,7 @@ export interface BotDeps {
 }
 
 /** 各感知的取樣間隔 */
-const INTERVAL = { screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
+const INTERVAL = { minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
 /** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
 const RETREAT_FACTOR = 2.5;
 const KITE_FACTOR = 2;
@@ -99,6 +102,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   const screens = createScreenHandler();
   const hpTracker = createHpTracker();
   const bossTracker = createBossTracker();
+  const navigator = createMinimapNavigator();
+  let bossStalled = false;
 
   const state: BotState = {
     running: false,
@@ -143,10 +148,22 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (b.stalled && boss) log?.info('boss: 血條沒下降，改一般走位去找首領');
         lowHp = nowLow;
         boss = nowBoss;
+        bossStalled = b.stalled;
         state.boss = boss;
         return { lowHp, boss };
       },
       { lowHp: false, boss: false },
+    ),
+    // 小地圖：持續觀察以校正方向；首領血條久不下降時走向首領點
+    bossSeek: throttle(
+      INTERVAL.minimap,
+      () => {
+        const m = deps.readMinimap?.() ?? null;
+        if (!m) return null;
+        navigator.observe(m.player, state.dirs, now());
+        return bossStalled && m.boss ? navigator.steer(m.player, m.boss) : null;
+      },
+      null as Dir[] | null,
     ),
     target: throttle(
       INTERVAL.indicator,
@@ -220,7 +237,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const frozen = sense.frozen.get(t);
       state.frozen = frozen;
       const busy = portal || vitals.lowHp || vitals.boss || frozen;
-      const target = busy ? null : sense.target.get(t);
+      const bossSeek = sense.bossSeek.get(t);
+      if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
+      const target = busy ? null : bossSeek ?? sense.target.get(t);
       const object = busy || target ? null : sense.object.get(t);
       const elapsed = t - startedAt;
       const { activity, want } = decide(
