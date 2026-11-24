@@ -15,6 +15,8 @@ export const KEYS = {
   down: { key: 's', code: 'KeyS', keyCode: 83 },
   left: { key: 'a', code: 'KeyA', keyCode: 65 },
   right: { key: 'd', code: 'KeyD', keyCode: 68 },
+  /** 開/關暫停選單（遊戲設定同步用） */
+  escape: { key: 'Escape', code: 'Escape', keyCode: 27 },
   /** 升級選卡第 1 張（只在 level_up 視窗有作用，其他時候遊戲忽略） */
   pick1: { key: '1', code: 'Digit1', keyCode: 49 },
 } as const satisfies Record<string, KeyDef>;

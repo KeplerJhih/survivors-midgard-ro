@@ -1,5 +1,7 @@
 import { createWorkerTicker } from '@/core/background/ticker';
 import { createBot } from '@/core/bot/bot';
+import { createGameSync } from '@/core/bot/game-sync';
+import { readPauseMenu } from '@/core/vision/pause';
 import { createOverlay } from '@/core/debug/overlay';
 import { createKeyboard } from '@/core/input/keyboard';
 import { createPointer } from '@/core/input/pointer';
@@ -45,8 +47,20 @@ export default defineContentScript({
     // UI 結構解析需要較高解析度（按鈕外框 1~2px）
     const sampleUI = createCanvasSampler(canvas, 640);
     const sampleObj = createCanvasSamplerByHeight(canvas, SAMPLE_HEIGHT);
+    const pointer = createPointer(canvas, () => /iPhone/.test(navigator.userAgent));
+    const gameSync = createGameSync({
+      keyboard,
+      pointer,
+      read: () => {
+        const frame = sampleUI();
+        return frame ? readPauseMenu(frame, parseLayout(frame)) : null;
+      },
+      desired: () => settings.game,
+      log,
+    });
     const bot = createBot(settings.bot, {
       keyboard,
+      gameSync,
       now: () => performance.now(),
       scanPortals: () => {
         const frame = sample();
@@ -94,13 +108,14 @@ export default defineContentScript({
         const frame = sampleHi();
         return frame ? readHp(frame) : null;
       },
-      pointer: createPointer(canvas, () => /iPhone/.test(navigator.userAgent)),
+      pointer,
       log,
     });
     const overlay = createOverlay(document);
     let removeTouch: (() => void) | null = null;
 
     const apply = (next: Settings) => {
+      if (JSON.stringify(next.game) !== JSON.stringify(settings.game)) gameSync.request();
       settings = next;
       bot.update(next.bot);
       overlay.setVisible(next.debug);

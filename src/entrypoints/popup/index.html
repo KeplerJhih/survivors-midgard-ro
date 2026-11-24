@@ -55,6 +55,21 @@
       <div class="hint">畫面辨識：結算頁→再玩一次、確認框→仍要離開/繼續、初始技能→上次選擇</div>
     </fieldset>
 
+    <fieldset>
+      <legend>遊戲設定（暫停選單，自動同步）</legend>
+      <label>隨機選擇
+        <select data-key="game.autoPick"><option value="on">開</option><option value="off">關</option><option value="keep">不動</option></select>
+      </label>
+      <div class="hint">遊戲依自己的挑選順序（暫停選單齒輪）自動選升級卡、不跳窗；遊戲每局開始會關掉，外掛會在每局開頭補開</div>
+      <label>累積強化
+        <select data-key="game.holdLevels"><option value="on">開</option><option value="off">關</option><option value="keep">不動</option></select>
+      </label>
+      <label>累積寶箱
+        <select data-key="game.holdChests"><option value="on">開</option><option value="off">關</option><option value="keep">不動</option></select>
+      </label>
+      <div class="hint">寶箱獎勵累積、不跳窗打斷走位</div>
+    </fieldset>
+
     <label><input type="checkbox" data-key="debug" /> Debug 面板與 log</label>
     <button id="reload" type="button">🔄 重新載入外掛（不刷新遊戲）</button>
     <div class="hint" style="margin-left:0">npm run build 後按這裡套用新版掛機邏輯；「頁面」區塊的設定仍需重新整理遊戲頁</div>

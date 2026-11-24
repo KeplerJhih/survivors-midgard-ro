@@ -12,13 +12,14 @@ import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
 import { createClockTracker, type TextBand } from '../vision/clock';
 import { decide, type Activity } from './decide';
+import type { GameSync } from './game-sync';
 import { throttle } from './throttle';
 
 const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 
 export interface BotState {
   running: boolean;
-  activity: Activity | 'screen';
+  activity: Activity | 'screen' | 'sync';
   boss: boolean;
   /** 遊戲時間停住（MVP 入口開著等） */
   frozen: boolean;
@@ -57,6 +58,8 @@ export interface BotDeps {
   clockBands?: () => TextBand[] | null;
   /** 走向粉紫光圈的方向 */
   approachSwirl?: () => Dir[] | null;
+  /** 遊戲內設定同步（暫停選單勾選框）；需要時 bot 會暫停其他行為 */
+  gameSync?: GameSync;
   pointer?: Pointer;
   log?: Logger;
 }
@@ -185,6 +188,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         state.lastScreen = act.kind;
         log?.info('screen: 點擊', act);
         void pointer.tap(act.x, act.y);
+        // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步
+        if (act.kind === 'start-skill') deps.gameSync?.request();
       }
       if (sense.screen.fresh) screenStreak = seen ? screenStreak + 1 : 0;
       // 連續 2 次取樣都看到視窗才停止移動（單張誤判不該讓角色在戰鬥中停下；真的視窗遊戲本來就暫停）
@@ -192,6 +197,15 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         for (const d of DIRS) keyboard.up(d);
         state.dirs = [];
         state.activity = 'screen';
+        return;
+      }
+
+      // 遊戲設定同步：只在對局中（時鐘已定位）且沒有視窗時開始
+      const syncing = deps.gameSync?.tick(t, !seen && clock.locked !== null) ?? false;
+      if (syncing) {
+        for (const d of DIRS) keyboard.up(d);
+        state.dirs = [];
+        state.activity = 'sync';
         return;
       }
 

@@ -22,6 +22,17 @@ export interface BotConfig {
   autoContinue: boolean;
 }
 
+/** 遊戲內的勾選設定：on/off 由外掛在暫停選單同步，keep 不動 */
+export type Toggle = 'on' | 'off' | 'keep';
+export interface GameToggles {
+  /** 隨機選擇（endless_auto_pick）：遊戲自己依稀有度挑最高，不跳窗不暫停；每局會被重設 */
+  autoPick: Toggle;
+  /** 累積強化（hold_levels） */
+  holdLevels: Toggle;
+  /** 累積寶箱（hold_chests）：寶箱不跳窗 */
+  holdChests: Toggle;
+}
+
 export interface Settings {
   /** 偽裝成 iPhone（需重新整理遊戲頁才生效） */
   mobile: boolean;
@@ -32,6 +43,7 @@ export interface Settings {
   /** 顯示 debug 面板與詳細 log */
   debug: boolean;
   bot: BotConfig;
+  game: GameToggles;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -39,6 +51,7 @@ export const DEFAULT_SETTINGS: Settings = {
   touchBridge: true,
   background: true,
   debug: false,
+  game: { autoPick: 'on', holdLevels: 'keep', holdChests: 'on' },
   bot: {
     enabled: false,
     mode: 'flower',
@@ -58,5 +71,6 @@ export const DEFAULT_SETTINGS: Settings = {
 export function mergeSettings(raw: unknown): Settings {
   const p = (raw && typeof raw === 'object' ? raw : {}) as Partial<Settings>;
   const bot = (p.bot && typeof p.bot === 'object' ? p.bot : {}) as Partial<BotConfig>;
-  return { ...DEFAULT_SETTINGS, ...p, bot: { ...DEFAULT_SETTINGS.bot, ...bot } };
+  const game = (p.game && typeof p.game === 'object' ? p.game : {}) as Partial<GameToggles>;
+  return { ...DEFAULT_SETTINGS, ...p, bot: { ...DEFAULT_SETTINGS.bot, ...bot }, game: { ...DEFAULT_SETTINGS.game, ...game } };
 }
