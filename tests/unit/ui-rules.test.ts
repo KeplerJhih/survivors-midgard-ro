@@ -164,6 +164,16 @@ describe('decideByLayout（結構判斷）', () => {
     expect(decide(f)).toBeNull();
   });
 
+  it('城鎮：明亮地面＋左上 4 顆按鈕一排，不當成結算頁', () => {
+    const f = draw([225, 225, 228], [
+      { x0: 0.01, y0: 0.01, x1: 0.07, y1: 0.045, fill: BTN },
+      { x0: 0.07, y0: 0.01, x1: 0.12, y1: 0.045, fill: BTN },
+      { x0: 0.12, y0: 0.01, x1: 0.21, y1: 0.045, fill: BTN },
+      { x0: 0.22, y0: 0.01, x1: 0.28, y1: 0.045, fill: BTN },
+    ]);
+    expect(decide(f)?.kind).not.toBe('result');
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },

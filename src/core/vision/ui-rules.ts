@@ -90,13 +90,18 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   // ---- 按鈕列 ----
   const buttonRows = rows(buttons);
   // 按鈕排所屬的面板：按鈕都在面板左右範圍內，且排位於面板內或緊貼其下方（≤ 8%）。
-  // 容器也接受直立的 card（選地圖右側面板被歸為 card）
-  const containers = regions.filter((r) => r.kind === 'panel' || r.kind === 'card');
+  // 容器也接受直立的 card（選地圖右側面板被歸為 card），以及面積 ≥ 10% 的 other
+  // （準備畫面大面板內含許多子面板、填滿率低被歸為 other）
+  const containers = regions.filter(
+    (r) => r.kind === 'panel' || r.kind === 'card' || (r.kind === 'other' && rw(r) * rh(r) >= 0.1),
+  );
   const container = (row: Region[]) =>
     containers
       .filter(
         (p) =>
-          row.every((b) => b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02) && cy(row[0]!) > p.y0 && cy(row[0]!) <= p.y1 + 0.08,
+          row.every((b) => b.x0 >= p.x0 - 0.02 && b.x1 <= p.x1 + 0.02) &&
+          cy(row[0]!) > p.y0 + 0.3 * rh(p) &&
+          cy(row[0]!) <= p.y1 + 0.08,
       )
       .sort((a, b) => rw(a) * rh(a) - rw(b) * rh(b))[0];
   // 只看屬於某個面板的按鈕排（排除畫面底部 HUD 的「已保留寶箱 [開啟]」等），取最下面那排
@@ -107,7 +112,8 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   // 結算：近全寬面板最下排。4 顆 [選擇目的地][再玩一次][前往城鎮][更換職業] → 第 2 顆；
   // 沒解鎖新地圖時沒有「選擇目的地」只剩 3 顆 [再玩一次][前往城鎮][更換職業] → 第 1 顆
   // （實機：3 顆時落到「最寬按鈕」規則，點了字最多的「前往 Prontera · 可以轉生！」而進城鎮）
-  if (bottom && (bottom.length === 4 || bottom.length === 3)) {
+  // 必須在畫面底部（城鎮左上 [選單][角色][頻道][衣櫃] 也是 4 顆一排）
+  if (bottom && (bottom.length === 4 || bottom.length === 3) && cy(bottom[0]!) >= 0.75) {
     const p = container(bottom);
     if (p && rw(p) >= 0.8) return tap('result', bottom[bottom.length === 4 ? 1 : 0]!);
   }
