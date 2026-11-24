@@ -7,13 +7,18 @@ export interface RafHost {
 
 export interface RafPatchDeps {
   win: RafHost;
-  /** 分頁是否真的被隱藏（隱藏時瀏覽器不再觸發原生 rAF） */
+  /** 分頁是否被隱藏（隱藏時瀏覽器不再觸發原生 rAF，直接接手） */
   isHidden: () => boolean;
   now: () => number;
+  /**
+   * 看門狗：callback 等超過這麼久原生 rAF 都沒觸發，就由 flush() 接手。
+   * 視窗被遮住/縮小時，原生 rAF 會停但 visibilityState 仍是 visible（實測），只靠 isHidden 不夠。
+   */
+  staleMs?: number;
 }
 
 export interface RafPatch {
-  /** 分頁隱藏時，執行所有等待中的 rAF callback；可見時什麼都不做 */
+  /** 執行原生 rAF 沒能及時觸發的 callback（分頁隱藏時全部、否則只處理超過 staleMs 的） */
   flush(): void;
   pendingCount(): number;
   restore(): void;
@@ -21,14 +26,14 @@ export interface RafPatch {
 
 /**
  * 接管 requestAnimationFrame：每個 callback 同時排進原生 rAF 與自己的佇列，
- * 誰先觸發就由誰執行（另一邊作廢）。可見時原生 rAF 照常驅動；
- * 隱藏時由外部時脈（Worker ticker）呼叫 flush() 推動遊戲主迴圈。
+ * 誰先觸發就由誰執行（另一邊作廢）。原生 rAF 正常時照常驅動；
+ * 分頁隱藏、或原生 rAF 停擺超過 staleMs 時，由外部時脈（Worker ticker）呼叫 flush() 推動遊戲主迴圈。
  * 必須在頁面腳本之前（document_start）安裝，頁面殼才會包到這一層。
  */
-export function patchRaf({ win, isHidden, now }: RafPatchDeps): RafPatch {
+export function patchRaf({ win, isHidden, now, staleMs = 100 }: RafPatchDeps): RafPatch {
   const nativeRaf = win.requestAnimationFrame.bind(win);
   const nativeCancel = win.cancelAnimationFrame.bind(win);
-  const pending = new Map<number, { cb: RafCallback; nativeId: number }>();
+  const pending = new Map<number, { cb: RafCallback; nativeId: number; at: number }>();
   let nextId = 1;
 
   const run = (cb: RafCallback, t: number) => {
@@ -50,7 +55,7 @@ export function patchRaf({ win, isHidden, now }: RafPatchDeps): RafPatch {
       pending.delete(id);
       run(p.cb, t);
     });
-    pending.set(id, { cb, nativeId });
+    pending.set(id, { cb, nativeId, at: now() });
     return id;
   };
 
@@ -63,14 +68,15 @@ export function patchRaf({ win, isHidden, now }: RafPatchDeps): RafPatch {
 
   return {
     flush() {
-      if (!isHidden() || pending.size === 0) return;
+      if (pending.size === 0) return;
       const t = now();
-      const batch = [...pending.values()];
-      pending.clear();
-      for (const p of batch) {
+      const hidden = isHidden();
+      const due = [...pending].filter(([, p]) => hidden || t - p.at >= staleMs);
+      for (const [id, p] of due) {
+        pending.delete(id);
         nativeCancel(p.nativeId);
-        run(p.cb, t);
       }
+      for (const [, p] of due) run(p.cb, t);
     },
     pendingCount: () => pending.size,
     restore() {

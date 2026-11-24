@@ -38,12 +38,23 @@ export default defineContentScript({
       log.info('settings applied', next);
     };
 
+    let received = false;
     window.addEventListener('message', (e) => {
       if (e.source !== window || !isBridgeMessage(e.data)) return;
-      if (e.data.type === 'settings') apply(mergeSettings(e.data.settings));
+      if (e.data.type === 'settings') {
+        received = true;
+        apply(mergeSettings(e.data.settings));
+      }
     });
+    // bridge（ISOLATED world）與本腳本的載入順序不固定，請求可能在對方開始監聽前送出而遺失：
+    // 收到第一份設定前持續重送（實測：重新整理後掛機一直停在預設的停用狀態）
     const req: BridgeMessage = { __msbot: true, type: 'request-settings' };
-    window.postMessage(req, location.origin);
+    const requestSettings = () => {
+      if (received) return;
+      window.postMessage(req, location.origin);
+      setTimeout(requestSettings, 500);
+    };
+    requestSettings();
 
     createWorkerTicker(TICK_MS, () => {
       bot.tick();

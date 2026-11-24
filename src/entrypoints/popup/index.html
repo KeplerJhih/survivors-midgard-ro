@@ -12,6 +12,7 @@
       .hint { font-size: 11px; color: #6b7487; margin: 2px 0 4px 22px; }
       .warn { color: #b3541e; }
       select, input[type='number'] { margin-left: auto; width: 96px; }
+      #reload { width: 100%; margin: 4px 0 6px; padding: 6px; font: inherit; cursor: pointer; }
       #status { font-size: 11px; color: #2f7a3e; min-height: 1.5em; }
     </style>
   </head>
@@ -43,6 +44,8 @@
     </fieldset>
 
     <label><input type="checkbox" data-key="debug" /> Debug 面板與 log</label>
+    <button id="reload" type="button">🔄 重新載入外掛＋遊戲頁</button>
+    <div class="hint" style="margin-left:0">npm run build 之後按這裡，不用到 chrome://extensions 手動重新載入</div>
     <div id="status"></div>
 
     <script type="module" src="./main.ts"></script>

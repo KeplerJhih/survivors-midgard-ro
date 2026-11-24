@@ -20,7 +20,7 @@ function fakeHost() {
 describe('patchRaf', () => {
   it('可見時由原生 rAF 執行，flush 不做事', () => {
     const { host, fireNative } = fakeHost();
-    const raf = patchRaf({ win: host, isHidden: () => false, now: () => 0 });
+    const raf = patchRaf({ win: host, isHidden: () => false, now: () => 0, staleMs: 100 });
     const calls: number[] = [];
     host.requestAnimationFrame((t) => calls.push(t));
     raf.flush();
@@ -56,6 +56,21 @@ describe('patchRaf', () => {
       raf.flush();
     }
     expect(frames).toBe(5);
+  });
+
+  it('可見但原生 rAF 停擺（視窗被遮住）超過 staleMs 時由 flush 接手', () => {
+    const { host, queue } = fakeHost();
+    let t = 0;
+    const raf = patchRaf({ win: host, isHidden: () => false, now: () => t, staleMs: 100 });
+    const calls: number[] = [];
+    host.requestAnimationFrame((time) => calls.push(time));
+    t = 50;
+    raf.flush();
+    expect(calls).toEqual([]); // 還沒逾時，等原生 rAF
+    t = 120;
+    raf.flush();
+    expect(calls).toEqual([120]);
+    expect(queue.size).toBe(0); // 對應的原生 rAF 已取消
   });
 
   it('cancelAnimationFrame 有效', () => {

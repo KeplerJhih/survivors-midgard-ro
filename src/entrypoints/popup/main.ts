@@ -1,3 +1,4 @@
+import { RELOAD_MESSAGE } from '@/core/messages';
 import type { Settings } from '@/core/settings';
 import { loadSettings, saveSettings } from '@/utils/settings-store';
 
@@ -40,5 +41,10 @@ async function main() {
     });
   }
 }
+
+document.getElementById('reload')!.addEventListener('click', () => {
+  // 外掛重新載入時 popup 會被關閉，不等回應
+  browser.runtime.sendMessage({ type: RELOAD_MESSAGE }).catch(() => {});
+});
 
 main();
