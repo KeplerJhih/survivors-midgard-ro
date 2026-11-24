@@ -1,115 +1,73 @@
 import type { Frame } from './frame';
+import type { Square } from './minimap';
 
 /**
  * 遊戲時間是否停住（MVP 入口傳送門開著時時間會停並等角色走進去；core/mvp_raid.gd state 'portal'）。
  *
- * 時鐘在右上小地圖面板內（「時間 mm:ss」），但 HUD 不是依畫面比例縮放（實機：978×685 時在 y≈0.19H，
- * 1080×734 時在 y≈0.22H），寫死座標會讀錯 → 自動定位：
- * 1. 右上區域的深色文字（亮度 < 75；面板半透明，只看深色字形才不受背景影響）按列切成文字帶
- * 2. 持續觀察各文字帶的變化，約每 1~2 秒變一次的那一帶就是時鐘並鎖定
- * 3. 鎖定的時鐘帶連續 freezeMs 不變 → 停住；未鎖定或時鐘帶消失 → 不判定（安全預設）
+ * 時鐘（「時間 mm:ss · 危險 n」）在小地圖正下方。HUD 不依畫面比例縮放，但面板內的相對位置固定 →
+ * 以小地圖方框為尺（邊長 S），時鐘列在方框底邊下方 0.19S~0.31S（實機量測：座標列 0.03~0.11S、時間列 0.21~0.29S、MVP 列 0.38~0.43S）。
+ * 舊做法在右上大範圍找「每秒會變的文字列」：MVP 戰的閃光透過半透明面板干擾，且座標列移動時也每秒變，會鎖錯列。
  */
-export const SEARCH = { x0: 0.78, x1: 1, y0: 0.04, y1: 0.42 };
-
-export interface TextBand {
-  /** 帶的中心 y（像素，在搜尋區內） */
-  y: number;
-  mask: Uint8Array;
-  on: number;
-}
-
-/** 切出搜尋區內的深色文字帶 */
-export function textBands(f: Frame): TextBand[] {
-  const X0 = Math.round(SEARCH.x0 * f.width);
-  const X1 = Math.round(SEARCH.x1 * f.width);
-  const Y0 = Math.round(SEARCH.y0 * f.height);
-  const Y1 = Math.round(SEARCH.y1 * f.height);
-  const w = X1 - X0;
-  const dark = (x: number, y: number) => {
-    const i = (y * f.width + x) * 4;
-    return 0.299 * f.data[i]! + 0.587 * f.data[i + 1]! + 0.114 * f.data[i + 2]! < 75;
-  };
-  const rowCount: number[] = [];
-  for (let y = Y0; y < Y1; y++) {
-    let n = 0;
-    for (let x = X0; x < X1; x++) if (dark(x, y)) n++;
-    rowCount.push(n);
-  }
-  const bands: TextBand[] = [];
-  let start = -1;
-  for (let r = 0; r <= rowCount.length; r++) {
-    const has = r < rowCount.length && rowCount[r]! >= 2 && rowCount[r]! < w * 0.6; // 排除整列深色（地圖圖塊等）
-    if (has && start < 0) start = r;
-    if (!has && start >= 0) {
-      const h = r - start;
-      if (h >= 3 && h <= 20) {
-        const mask = new Uint8Array(h * w);
-        let on = 0;
-        for (let yy = 0; yy < h; yy++)
-          for (let x = 0; x < w; x++) if (dark(X0 + x, Y0 + start + yy)) (mask[yy * w + x] = 1), on++;
-        bands.push({ y: start + h / 2, mask, on });
-      }
-      start = -1;
+export function clockGlyph(f: Frame, sq: Square): Uint8Array {
+  const S = sq.x1 - sq.x0;
+  const y0 = Math.round(sq.y1 + 0.19 * S);
+  const y1 = Math.min(f.height, Math.round(sq.y1 + 0.31 * S));
+  const w = sq.x1 - sq.x0;
+  const mask = new Uint8Array(Math.max(0, y1 - y0) * w);
+  for (let y = y0; y < y1; y++)
+    for (let x = 0; x < w; x++) {
+      const i = (y * f.width + sq.x0 + x) * 4;
+      // 深色字形（亮度 < 75）：面板半透明，只看字形才不受背景影響
+      if (0.299 * f.data[i]! + 0.587 * f.data[i + 1]! + 0.114 * f.data[i + 2]! < 75) mask[(y - y0) * w + x] = 1;
     }
-  }
-  return bands;
+  return mask;
 }
 
-const changed = (a: TextBand, b: TextBand) => {
-  if (a.mask.length !== b.mask.length) return true;
-  let d = 0;
-  for (let i = 0; i < a.mask.length; i++) d += a.mask[i]! ^ b.mask[i]!;
-  return d > Math.max(3, Math.max(a.on, b.on) * 0.1);
-};
-
-export interface ClockTracker {
-  /** 每秒左右呼叫一次；回傳時間是否停住 */
-  update(bands: TextBand[] | null, now: number): boolean;
-  /** 已鎖定的時鐘帶 y（未鎖定為 null） */
-  readonly locked: number | null;
+export interface FreezeDetector {
+  /** 每秒左右呼叫；回傳時間是否停住 */
+  update(glyph: Uint8Array | null, now: number): boolean;
+  /** 最近看到時鐘在走（判斷「在對局中」） */
+  readonly ticking: boolean;
 }
 
-export function createClockTracker(freezeMs = 3000, window = 6): ClockTracker {
-  type Track = { y: number; last: TextBand; history: boolean[]; unchangedSince: number };
-  let tracks: Track[] = [];
-  let lockedY: number | null = null;
-  let lostSince = -1;
+/** 字形連續 freezeMs 不變 → 停住。必須先看過它走動（開局就停住不判定；讀不到就重置） */
+export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
+  let last: Uint8Array | null = null;
+  let lastOn = 0;
+  let changedAt = -Infinity;
+  let ticked = false;
+  let nowT = 0;
   return {
-    get locked() {
-      return lockedY;
+    get ticking() {
+      return ticked && nowT - changedAt < 10000;
     },
-    update(bands, now) {
-      if (!bands) return false;
-      const next: Track[] = [];
-      for (const b of bands) {
-        const t = tracks.find((tr) => Math.abs(tr.y - b.y) <= 2);
-        if (!t) {
-          next.push({ y: b.y, last: b, history: [], unchangedSince: now });
-          continue;
-        }
-        const c = changed(t.last, b);
-        const history = [...t.history, c].slice(-window);
-        next.push({ y: b.y, last: b, history, unchangedSince: c ? now : t.unchangedSince });
-      }
-      tracks = next;
-      // 鎖定：近 window 次中變化 40%~100%（約每 1~2 秒變一次）的帶
-      if (lockedY === null) {
-        const cand = tracks
-          .filter((t) => t.history.length >= 4)
-          .map((t) => ({ t, rate: t.history.filter(Boolean).length / t.history.length }))
-          .filter((c) => c.rate >= 0.4)
-          .sort((a, b) => b.rate - a.rate)[0];
-        if (cand) lockedY = cand.t.y;
-      }
-      if (lockedY === null) return false;
-      const clock = tracks.find((t) => Math.abs(t.y - lockedY!) <= 2);
-      if (!clock) {
-        if (lostSince < 0) lostSince = now;
-        if (now - lostSince > 5000) lockedY = null; // 版面變了（換視窗大小、進城鎮）→ 重新定位
+    update(glyph, now) {
+      nowT = now;
+      if (!glyph) {
+        last = null;
+        ticked = false;
         return false;
       }
-      lostSince = -1;
-      return now - clock.unchangedSince >= freezeMs;
+      let on = 0;
+      for (let i = 0; i < glyph.length; i++) on += glyph[i]!;
+      if (on < 10) {
+        last = null;
+        ticked = false;
+        return false;
+      }
+      if (last && last.length === glyph.length) {
+        let d = 0;
+        for (let i = 0; i < glyph.length; i++) d += glyph[i]! ^ last[i]!;
+        if (d > Math.max(3, Math.max(on, lastOn) * 0.1)) {
+          changedAt = now;
+          ticked = true;
+        }
+      } else {
+        changedAt = now; // 第一次或版面改變：重新計時
+      }
+      last = glyph;
+      lastOn = on;
+      return ticked && now - changedAt >= freezeMs;
     },
   };
 }

@@ -162,7 +162,7 @@ describe('首領血條久不下降 → 依小地圖走向首領', () => {
     let p = { x: 100, y: 100 };
     let held: string[] = [];
     const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'wander' },
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'flower' },
       {
         keyboard,
         now: () => t,

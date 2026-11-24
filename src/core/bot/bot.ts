@@ -10,7 +10,7 @@ import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
-import { createClockTracker, type TextBand } from '../vision/clock';
+import { createFreezeDetector } from '../vision/clock';
 import { createMinimapNavigator, type MinimapRead } from '../vision/minimap';
 import { decide, type Activity } from './decide';
 import type { GameSync } from './game-sync';
@@ -58,8 +58,8 @@ export interface BotDeps {
   /** 首領血條剩餘量（0＝沒有首領戰） */
   bossBar?: () => number;
   findObjects?: () => ObjectHit[] | null;
-  /** 右上區域的深色文字帶（自動定位時鐘，判斷遊戲時間是否停住） */
-  clockBands?: () => TextBand[] | null;
+  /** 右上時鐘字形（小地圖下方；判斷遊戲時間是否停住） */
+  clockGlyph?: () => Uint8Array | null;
   /** 走向粉紫光圈的方向 */
   approachSwirl?: () => Dir[] | null;
   /** 遊戲內設定同步（暫停選單勾選框）；需要時 bot 會暫停其他行為 */
@@ -98,7 +98,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
   const objectSeeker = createObjectSeeker();
-  const clock = createClockTracker();
+  const clock = createFreezeDetector();
   const screens = createScreenHandler();
   const hpTracker = createHpTracker();
   const bossTracker = createBossTracker();
@@ -175,7 +175,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       () => (config.seekObjects && deps.findObjects ? objectSeeker.update(deps.findObjects(), now()) : null),
       null as Dir[] | null,
     ),
-    frozen: throttle(INTERVAL.clock, () => (deps.clockBands ? clock.update(deps.clockBands(), now()) : false), false),
+    frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? clock.update(deps.clockGlyph(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
@@ -224,7 +224,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       }
 
       // 遊戲設定同步：只在對局中（時鐘已定位）且沒有視窗時開始
-      const syncing = deps.gameSync?.tick(t, !seen && clock.locked !== null) ?? false;
+      const syncing = deps.gameSync?.tick(t, !seen && clock.ticking) ?? false;
       if (syncing) {
         for (const d of DIRS) keyboard.up(d);
         state.dirs = [];

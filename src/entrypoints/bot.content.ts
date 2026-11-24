@@ -17,9 +17,9 @@ import { parseLayout } from '@/core/vision/layout';
 import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
 import { approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
-import { textBands } from '@/core/vision/clock';
+import { clockGlyph } from '@/core/vision/clock';
 import { bossBar, readHp } from '@/core/vision/hud';
-import { MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
+import { findMinimapSquare, MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
 
 const TICK_MS = 50;
 
@@ -90,9 +90,10 @@ export default defineContentScript({
         const frame = sample();
         return frame ? probeDanger(frame) : null;
       },
-      clockBands: () => {
-        const frame = sampleUI();
-        return frame ? textBands(frame) : null;
+      clockGlyph: () => {
+        const frame = sampleMinimap();
+        const sq = frame && findMinimapSquare(frame);
+        return frame && sq ? clockGlyph(frame, sq) : null;
       },
       approachSwirl: () => {
         const frame = sample();
