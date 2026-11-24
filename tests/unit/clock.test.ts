@@ -1,35 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { createFreezeDetector } from '@/core/vision/clock';
+import { createClockTracker, type TextBand } from '@/core/vision/clock';
 import { decide } from '@/core/bot/decide';
 
-const glyph = (seed: number) => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + seed) % 5 === 0 ? 1 : 0));
+const band = (y: number, seed: number): TextBand => {
+  const mask = Uint8Array.from({ length: 200 }, (_, i) => ((i * 7 + seed * 13) % 5 === 0 ? 1 : 0));
+  return { y, mask, on: mask.reduce((s, v) => s + v, 0) };
+};
 
-describe('createFreezeDetector', () => {
-  it('字形連續 3 秒不變才判定停住；一變就解除', () => {
-    const d = createFreezeDetector(3000);
-    expect(d.update(glyph(0), 0)).toBe(false);
-    expect(d.update(glyph(0), 1000)).toBe(false);
-    expect(d.update(glyph(0), 3000)).toBe(false);
-    expect(d.update(glyph(0), 4000)).toBe(true);
-    expect(d.update(glyph(1), 5000)).toBe(false);
+describe('createClockTracker（自動定位時鐘）', () => {
+  it('鎖定每秒在變的文字帶；之後該帶連續 3 秒不變判定停住', () => {
+    const t = createClockTracker(3000);
+    let now = 0;
+    // 地圖名稱帶（y=10）不變，時鐘帶（y=30）每秒變
+    for (let s = 0; s < 6; s++, now += 1000) expect(t.update([band(10, 0), band(30, s)], now)).toBe(false);
+    expect(t.locked).toBe(30);
+    // 時鐘停住
+    for (let s = 0; s < 3; s++, now += 1000) t.update([band(10, 0), band(30, 99)], now);
+    expect(t.update([band(10, 0), band(30, 99)], now)).toBe(true);
+    // 恢復走動
+    expect(t.update([band(10, 0), band(30, 100)], now + 1000)).toBe(false);
   });
 
-  it('背景透出造成少量雜訊（< 10%）仍判定停住', () => {
-    const d = createFreezeDetector(2000);
-    const g = glyph(0);
-    const noisy = Uint8Array.from(g);
-    noisy[1] = noisy[1]! ^ 1;
-    noisy[2] = noisy[2]! ^ 1;
-    d.update(g, 0);
-    d.update(noisy, 1000);
-    expect(d.update(g, 3000)).toBe(true);
+  it('還沒鎖定時（開局就停住）不判定停住', () => {
+    const t = createClockTracker(3000);
+    for (let s = 0; s < 8; s++) expect(t.update([band(10, 0), band(30, 0)], s * 1000)).toBe(false);
+    expect(t.locked).toBeNull();
   });
 
-  it('字形太少（讀不到時鐘）不判定', () => {
-    const d = createFreezeDetector(1000);
-    const empty = new Uint8Array(300);
-    d.update(empty, 0);
-    expect(d.update(empty, 5000)).toBe(false);
+  it('時鐘帶消失超過 5 秒就解除鎖定（版面改變）', () => {
+    const t = createClockTracker(3000);
+    for (let s = 0; s < 6; s++) t.update([band(30, s)], s * 1000);
+    expect(t.locked).toBe(30);
+    for (let s = 6; s < 13; s++) t.update([band(70, 0)], s * 1000);
+    expect(t.locked).toBeNull();
   });
 });
 

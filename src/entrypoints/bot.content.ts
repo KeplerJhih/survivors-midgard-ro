@@ -15,7 +15,7 @@ import { parseLayout } from '@/core/vision/layout';
 import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
 import { approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
-import { clockGlyph } from '@/core/vision/clock';
+import { textBands } from '@/core/vision/clock';
 import { bossFight, readHp } from '@/core/vision/hud';
 
 const TICK_MS = 50;
@@ -70,9 +70,9 @@ export default defineContentScript({
         const frame = sample();
         return frame ? probeDanger(frame) : null;
       },
-      clockGlyph: () => {
+      clockBands: () => {
         const frame = sampleUI();
-        return frame ? clockGlyph(frame) : null;
+        return frame ? textBands(frame) : null;
       },
       approachSwirl: () => {
         const frame = sample();

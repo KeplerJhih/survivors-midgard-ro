@@ -10,7 +10,7 @@ import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
-import { createFreezeDetector } from '../vision/clock';
+import { createClockTracker, type TextBand } from '../vision/clock';
 import { decide, type Activity } from './decide';
 import { throttle } from './throttle';
 
@@ -53,8 +53,8 @@ export interface BotDeps {
   readHp?: () => HpReading | null;
   bossFight?: () => boolean;
   findObjects?: () => ObjectHit[] | null;
-  /** 右上時鐘字形（判斷遊戲時間是否停住） */
-  clockGlyph?: () => Uint8Array | null;
+  /** 右上區域的深色文字帶（自動定位時鐘，判斷遊戲時間是否停住） */
+  clockBands?: () => TextBand[] | null;
   /** 走向粉紫光圈的方向 */
   approachSwirl?: () => Dir[] | null;
   pointer?: Pointer;
@@ -91,7 +91,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
   const objectSeeker = createObjectSeeker();
-  const freeze = createFreezeDetector();
+  const clock = createClockTracker();
   const screens = createScreenHandler();
   const hpTracker = createHpTracker();
 
@@ -150,7 +150,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       () => (config.seekObjects && deps.findObjects ? objectSeeker.update(deps.findObjects(), now()) : null),
       null as Dir[] | null,
     ),
-    frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? freeze.update(deps.clockGlyph(), now()) : false), false),
+    frozen: throttle(INTERVAL.clock, () => (deps.clockBands ? clock.update(deps.clockBands(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
