@@ -84,14 +84,24 @@ export function dodge(p: DangerProbes, want: Dir[], threshold = 0.15): Dir[] | n
 export const isHypnoSwirl = (r: number, g: number, b: number) =>
   r >= 225 && b >= 230 && g >= 150 && g <= 200 && r - g >= 45 && b - g >= 45;
 
-/** 螺旋太靠近角色（重心距離 < near×H）時，回傳遠離它的方向；否則 null */
-export function fleeSwirl(f: Frame, near = 0.25): Dir[] | null {
+/** 粉紫光圈（催眠師螺旋；Baphomet 等 MVP 入口傳送門也是同色系）的位置，以畫面高度正規化 */
+export function findSwirl(f: Frame): { x: number; y: number } | null {
   const blob = findBlob(f, isHypnoSwirl, 12);
   if (!blob) return null;
-  // findBlob 以寬度正規化；換成以高度正規化
-  const k = f.width / f.height;
-  const x = blob.x * k;
-  const y = blob.y * k;
-  if (Math.hypot(x, y) >= near) return null;
-  return dirsFromAngle(Math.atan2(y, -x)); // 反方向（畫面 y 向下 → 角度 y 取正即為遠離）
+  const k = f.width / f.height; // findBlob 以寬度正規化 → 換成以高度正規化
+  return { x: blob.x * k, y: blob.y * k };
+}
+
+/** 螺旋太靠近角色（重心距離 < near×H）時，回傳遠離它的方向；否則 null */
+export function fleeSwirl(f: Frame, near = 0.25): Dir[] | null {
+  const s = findSwirl(f);
+  if (!s || Math.hypot(s.x, s.y) >= near) return null;
+  return dirsFromAngle(Math.atan2(s.y, -s.x)); // 反方向（畫面 y 向下 → 角度 y 取正即為遠離）
+}
+
+/** 走向粉紫光圈（時間停住＝MVP 入口開著時，光圈是傳送門而非催眠師） */
+export function approachSwirl(f: Frame): Dir[] | null {
+  const s = findSwirl(f);
+  if (!s) return null;
+  return dirsFromAngle(Math.atan2(-s.y, s.x));
 }

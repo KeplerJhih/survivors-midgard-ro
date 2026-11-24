@@ -10,6 +10,7 @@ import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
+import { createFreezeDetector } from '../vision/clock';
 import { decide, type Activity } from './decide';
 import { throttle } from './throttle';
 
@@ -19,6 +20,8 @@ export interface BotState {
   running: boolean;
   activity: Activity | 'screen';
   boss: boolean;
+  /** 遊戲時間停住（MVP 入口開著等） */
+  frozen: boolean;
   /** 最近讀到的 HP 比例（-1 表示讀不到） */
   hp: number;
   dodges: number;
@@ -50,12 +53,16 @@ export interface BotDeps {
   readHp?: () => HpReading | null;
   bossFight?: () => boolean;
   findObjects?: () => ObjectHit[] | null;
+  /** 右上時鐘字形（判斷遊戲時間是否停住） */
+  clockGlyph?: () => Uint8Array | null;
+  /** 走向粉紫光圈的方向 */
+  approachSwirl?: () => Dir[] | null;
   pointer?: Pointer;
   log?: Logger;
 }
 
 /** 各感知的取樣間隔 */
-const INTERVAL = { screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600 };
+const INTERVAL = { screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
 /** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
 const RETREAT_FACTOR = 2.5;
 const KITE_FACTOR = 2;
@@ -84,6 +91,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
   const objectSeeker = createObjectSeeker();
+  const freeze = createFreezeDetector();
   const screens = createScreenHandler();
   const hpTracker = createHpTracker();
 
@@ -94,6 +102,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     dodges: 0,
     hp: -1,
     boss: false,
+    frozen: false,
     screenTaps: 0,
     dirs: [],
     scans: 0,
@@ -141,6 +150,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       () => (config.seekObjects && deps.findObjects ? objectSeeker.update(deps.findObjects(), now()) : null),
       null as Dir[] | null,
     ),
+    frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? freeze.update(deps.clockGlyph(), now()) : false), false),
+    approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
   };
@@ -186,12 +197,23 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
 
       const vitals = sense.vitals.get(t);
       const portal = sense.portal.get(t);
-      const busy = portal || vitals.lowHp || vitals.boss;
+      const frozen = sense.frozen.get(t);
+      state.frozen = frozen;
+      const busy = portal || vitals.lowHp || vitals.boss || frozen;
       const target = busy ? null : sense.target.get(t);
       const object = busy || target ? null : sense.object.get(t);
       const elapsed = t - startedAt;
       const { activity, want } = decide(
-        { portal, target, object, flee: sense.swirl.get(t), danger: sense.danger.get(t), ...vitals },
+        {
+          portal,
+          target,
+          object,
+          frozen,
+          approach: frozen && !vitals.boss ? sense.approach.get(t) : null,
+          flee: frozen ? null : sense.swirl.get(t),
+          danger: sense.danger.get(t),
+          ...vitals,
+        },
         { patrol: moves.patrol(elapsed), retreat: moves.retreat(elapsed), kite: moves.kite(elapsed) },
       );
       if (activity === 'dodge' && !dodging) state.dodges++;

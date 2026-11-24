@@ -14,7 +14,8 @@ import { detectScreen } from '@/core/vision/screens';
 import { parseLayout } from '@/core/vision/layout';
 import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
-import { fleeSwirl, probeDanger } from '@/core/vision/danger';
+import { approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
+import { clockGlyph } from '@/core/vision/clock';
 import { bossFight, readHp } from '@/core/vision/hud';
 
 const TICK_MS = 50;
@@ -64,6 +65,14 @@ export default defineContentScript({
       probeDanger: () => {
         const frame = sample();
         return frame ? probeDanger(frame) : null;
+      },
+      clockGlyph: () => {
+        const frame = sampleUI();
+        return frame ? clockGlyph(frame) : null;
+      },
+      approachSwirl: () => {
+        const frame = sample();
+        return frame ? approachSwirl(frame) : null;
       },
       fleeSwirl: () => {
         const frame = sample();
@@ -134,6 +143,7 @@ export default defineContentScript({
         dodges: bot.state.dodges,
         hp: bot.state.hp,
         boss: bot.state.boss,
+        frozen: bot.state.frozen,
         picks: bot.state.picks,
         touch: removeTouch ? 'bridge' : '-',
       });
