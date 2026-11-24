@@ -18,7 +18,7 @@ import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
 import { approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { textBands } from '@/core/vision/clock';
-import { bossFight, readHp } from '@/core/vision/hud';
+import { bossBar, readHp } from '@/core/vision/hud';
 
 const TICK_MS = 50;
 
@@ -104,9 +104,9 @@ export default defineContentScript({
         const frame = sampleObj();
         return frame ? findObjects(frame, 0.8) : null;
       },
-      bossFight: () => {
+      bossBar: () => {
         const frame = sampleHi();
-        return frame ? bossFight(frame) : false;
+        return frame ? bossBar(frame) : 0;
       },
       readHp: () => {
         const frame = sampleHi();

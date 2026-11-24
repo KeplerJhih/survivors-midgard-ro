@@ -163,17 +163,18 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
 
 /**
  * 實機：寶箱視窗的「繼續」只有兩個字，按鈕內部被文字切成小塊（寬 2.8%、高 3.5%），不像按鈕。
- * 條件：置中大面板（面積 15~50%、填滿率 ≥ 0.8）內沒有偵測到按鈕；面板底部 15% 內、靠近中線（±10%）有小亮塊。
+ * 條件：置中大面板（面積 15~60%、填滿率 ≥ 0.6；累積寶箱清單視窗高 89%、被分類成 card、填滿率 0.67）內沒有偵測到按鈕；
+ * 面板底部 15% 內、靠近中線（±10%）有小亮塊。
  */
 function bottomFragment(regions: Region[], buttons: Region[]): Region | null {
   const panel = regions.find(
     (r) =>
-      r.kind === 'panel' &&
+      (r.kind === 'panel' || r.kind === 'card') &&
       Math.abs(cx(r) - 0.5) < 0.06 &&
       Math.abs(cy(r) - 0.5) < 0.12 &&
       rw(r) * rh(r) >= 0.15 &&
-      rw(r) * rh(r) <= 0.5 &&
-      r.fill >= 0.8,
+      rw(r) * rh(r) <= 0.6 &&
+      r.fill >= 0.6,
   );
   if (!panel || buttons.some((b) => inside(b, panel, 0.01))) return null;
   return (

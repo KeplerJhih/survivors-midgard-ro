@@ -5,7 +5,7 @@ import type { Dir } from '../movement/directions';
 import { circle, createStrategy, type Strategy } from '../movement/strategies';
 import type { BotConfig } from '../settings';
 import type { DangerProbes } from '../vision/danger';
-import { createHpTracker, type HpReading } from '../vision/hud';
+import { createBossTracker, createHpTracker, type HpReading } from '../vision/hud';
 import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
@@ -52,7 +52,8 @@ export interface BotDeps {
   probeDanger?: () => DangerProbes | null;
   fleeSwirl?: () => Dir[] | null;
   readHp?: () => HpReading | null;
-  bossFight?: () => boolean;
+  /** 首領血條剩餘量（0＝沒有首領戰） */
+  bossBar?: () => number;
   findObjects?: () => ObjectHit[] | null;
   /** 右上區域的深色文字帶（自動定位時鐘，判斷遊戲時間是否停住） */
   clockBands?: () => TextBand[] | null;
@@ -97,6 +98,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   const clock = createClockTracker();
   const screens = createScreenHandler();
   const hpTracker = createHpTracker();
+  const bossTracker = createBossTracker();
 
   const state: BotState = {
     running: false,
@@ -134,8 +136,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         state.hp = hp ? Math.round(hp.ratio * 100) / 100 : -1;
         const nowLow = hp !== null && (hp.low || hp.ratio < config.lowHpRatio);
         if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
-        const nowBoss = config.bossKite && deps.bossFight ? deps.bossFight() : false;
+        const b = bossTracker.update(config.bossKite && deps.bossBar ? deps.bossBar() : 0, now());
+        // 血條很久沒下降＝沒打到（首領在畫面外）→ 不風箏，照一般走位 / 追指示器去找它
+        const nowBoss = b.boss && !b.stalled;
         if (nowBoss && !boss) log?.info('boss: 首領戰，改大圈風箏');
+        if (b.stalled && boss) log?.info('boss: 血條沒下降，改一般走位去找首領');
         lowHp = nowLow;
         boss = nowBoss;
         state.boss = boss;

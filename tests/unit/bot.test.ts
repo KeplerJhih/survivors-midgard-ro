@@ -141,7 +141,7 @@ describe('bot', () => {
         keyboard,
         now: () => t,
         readHp: () => ({ fill: 20, low: false }),
-        bossFight: () => true,
+        bossBar: () => 0.003,
         findIndicators: () => [{ kind: 'target', x: 0, y: -0.3, icon: [255, 218, 112], size: 0.05 }],
       },
     );

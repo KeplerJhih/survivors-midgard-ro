@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '@/core/vision/frame';
-import { bossFight, createHpTracker, readHp } from '@/core/vision/hud';
+import { bossFight, createBossTracker, createHpTracker, readHp } from '@/core/vision/hud';
 
 const W = 320;
 const H = 224;
@@ -45,5 +45,21 @@ describe('bossFight', () => {
     const d = f.data as Uint8ClampedArray;
     for (let y = 8; y < 11; y++) for (let x = 123; x < 197; x++) d.set([237, 107, 140, 255], (y * W + x) * 4);
     expect(bossFight(f)).toBe(true);
+  });
+});
+
+describe('createBossTracker', () => {
+  it('血條 15 秒沒下降 → stalled；開始下降就恢復', () => {
+    const t = createBossTracker(15000);
+    expect(t.update(0.003, 0)).toEqual({ boss: true, stalled: false });
+    expect(t.update(0.003, 14000).stalled).toBe(false);
+    expect(t.update(0.003, 15000).stalled).toBe(true);
+    expect(t.update(0.0028, 16000).stalled).toBe(false);
+  });
+  it('首領戰結束（血條消失）重置', () => {
+    const t = createBossTracker(15000);
+    t.update(0.003, 0);
+    expect(t.update(0, 20000)).toEqual({ boss: false, stalled: false });
+    expect(t.update(0.003, 21000).stalled).toBe(false);
   });
 });

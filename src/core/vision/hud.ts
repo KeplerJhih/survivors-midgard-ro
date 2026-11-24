@@ -72,6 +72,11 @@ export function createHpTracker(): HpTracker {
 const BOSS_BAR: [number, number, number] = [237, 107, 140];
 
 export function bossFight(f: Frame): boolean {
+  return bossBar(f) > 0;
+}
+
+/** 首領血條剩餘量（血條像素占畫面比例；沒有首領戰為 0） */
+export function bossBar(f: Frame): number {
   const { width: W, height: H, data } = f;
   let n = 0;
   for (let y = 0; y < Math.ceil(0.1 * H); y++) {
@@ -80,5 +85,28 @@ export function bossFight(f: Frame): boolean {
       if (near(data[i]!, data[i + 1]!, data[i + 2]!, BOSS_BAR, 35)) n++;
     }
   }
-  return n >= W * H * 0.0015;
+  return n >= W * H * 0.0015 ? n / (W * H) : 0;
+}
+
+/**
+ * 首領戰是否「沒在打」：血條連續 stallMs 沒有下降（實機：Thief Bug Egg 在畫面外，
+ * 大圈風箏繞著起點轉、一直打不到，血量停在 100% 超過一分鐘）→ 改回一般走位去找它。
+ * 血條一開始下降就恢復風箏。
+ */
+export function createBossTracker(stallMs = 15000) {
+  let best = Infinity;
+  let progressAt = 0;
+  return {
+    update(bar: number, now: number): { boss: boolean; stalled: boolean } {
+      if (bar <= 0) {
+        best = Infinity;
+        return { boss: false, stalled: false };
+      }
+      if (best === Infinity || bar < best * 0.97) {
+        best = Math.min(best, bar);
+        progressAt = now;
+      }
+      return { boss: true, stalled: now - progressAt >= stallMs };
+    },
+  };
 }
