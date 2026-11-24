@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dirsFromAngle, TAU } from '@/core/movement/directions';
-import { circle, createStrategy, figure8, flower } from '@/core/movement/strategies';
+import { circle, createStrategy, figure8, flower, wander } from '@/core/movement/strategies';
 
 describe('dirsFromAngle', () => {
   it.each([
@@ -52,6 +52,22 @@ describe('strategies', () => {
   ])('%s 長時間掛機不會漂走（10 個週期後回到起點）', (_name, s) => {
     const { drift } = simulate(s, 40000);
     expect(drift).toBeLessThan(40); // 位移單位：速度×毫秒，一圈周長約 4000
+  });
+
+  it('wander：方向會變、長時間不漂走（離起點不超過約 0.5 個週期距離）', () => {
+    const s = wander(4000, 42);
+    const dirs = new Set(Array.from({ length: 300 }, (_, i) => s(i * 200).join('+')));
+    expect(dirs.size).toBeGreaterThanOrEqual(5);
+    const { maxR } = simulate(wander(4000, 7), 120000, 10);
+    expect(maxR).toBeLessThan(0.5 * 4000 + 2000);
+  });
+
+  it('wander：同一種子可重現；時間倒退會重置', () => {
+    const a = wander(4000, 1);
+    const b = wander(4000, 1);
+    const seqA = [0, 1500, 3000, 6000].map((t) => a(t).join('+'));
+    expect([0, 1500, 3000, 6000].map((t) => b(t).join('+'))).toEqual(seqA);
+    expect(a(0).join('+')).toBe(seqA[0]);
   });
 
   it('figure8 是上下兩個圓，涵蓋高度約為同週期繞圈的兩倍', () => {

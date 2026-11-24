@@ -3,7 +3,7 @@ import { dirsFromAngle, TAU, type Dir } from './directions';
 /** 走位策略：給定已經過的毫秒數，回傳此刻要按住的方向鍵。純函式，方便測試。 */
 export type Strategy = (elapsedMs: number) => Dir[];
 
-export type MoveMode = 'none' | 'circle' | 'figure8' | 'flower';
+export type MoveMode = 'none' | 'circle' | 'figure8' | 'flower' | 'wander';
 
 export interface MoveOptions {
   /** 繞一圈的時間 */
@@ -51,6 +51,65 @@ export function flower(periodMs: number): Strategy {
   };
 }
 
+/** 可重現的亂數（mulberry32） */
+function rng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * 隨機走動：每段隨機挑 8 方向之一、走 0.25~0.6 個週期（例：週期 4 秒 → 1~2.5 秒）後換方向。
+ * 內部估算位移（Input.get_vector 會正規化斜向），離起點超過 0.35 個週期的距離就改朝起點走（±45° 隨機），
+ * 範圍與花瓣相近、不會漂走。時間倒退（重新啟動）時重置。
+ */
+export function wander(periodMs: number, seed = Math.floor(Math.random() * 2 ** 32)): Strategy {
+  const radius = 0.35 * periodMs;
+  let rand = rng(seed);
+  let segStart = 0;
+  let segEnd = 0;
+  let heading = 0;
+  let x = 0;
+  let y = 0;
+  const reset = () => {
+    rand = rng(seed);
+    segStart = 0;
+    segEnd = 0;
+    x = 0;
+    y = 0;
+  };
+  const nextSegment = () => {
+    if (Math.hypot(x, y) > radius) {
+      heading = Math.atan2(-y, -x) + (rand() - 0.5) * (Math.PI / 2);
+    } else {
+      heading = Math.floor(rand() * 8) * (Math.PI / 4);
+    }
+    segStart = segEnd;
+    segEnd = segStart + periodMs * (0.25 + rand() * 0.35);
+  };
+  const advance = (from: number, to: number) => {
+    const d = dirsFromAngle(heading);
+    const vx = (d.includes('right') ? 1 : 0) - (d.includes('left') ? 1 : 0);
+    const vy = (d.includes('up') ? 1 : 0) - (d.includes('down') ? 1 : 0);
+    const n = Math.hypot(vx, vy) || 1;
+    x += (vx / n) * (to - from);
+    y += (vy / n) * (to - from);
+  };
+  return (t) => {
+    if (t < segStart) reset();
+    while (t >= segEnd) {
+      advance(segStart, segEnd);
+      nextSegment();
+    }
+    return dirsFromAngle(heading);
+  };
+}
+
 export function createStrategy(mode: MoveMode, opts: MoveOptions): Strategy {
   switch (mode) {
     case 'circle':
@@ -59,6 +118,8 @@ export function createStrategy(mode: MoveMode, opts: MoveOptions): Strategy {
       return figure8(opts.circlePeriodMs);
     case 'flower':
       return flower(opts.circlePeriodMs);
+    case 'wander':
+      return wander(opts.circlePeriodMs);
     case 'none':
       return none;
   }
