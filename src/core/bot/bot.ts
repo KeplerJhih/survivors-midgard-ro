@@ -73,6 +73,8 @@ export interface BotDeps {
 /** 各感知的取樣間隔 */
 /** MVP 勝利後找出口的時限 */
 const EXIT_WINDOW = 30000;
+/** 撤退解除前 HP 須連續回到門檻以上的時間 */
+const HP_RECOVER_MS = 3000;
 const INTERVAL = { minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
 /** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
 const RETREAT_FACTOR = 2.5;
@@ -100,6 +102,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let screenStreak = 0;
   let mvpFight = false;
   let hpSeenAt = -Infinity;
+  let recoverSince: number | null = null;
   let lastBossAt = -Infinity;
 
   const portalSeeker = createPortalSeeker();
@@ -150,10 +153,16 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 門檻 0.35 進撤退時已來不及）；讀不到時沿用
         if (hp) hpSeenAt = now();
         // 讀不到時沿用，但最多 5 秒（實機：HP 列學錯後一直讀不到，卡在撤退）
-        const nowLow =
+        let nowLow =
           hp === null
             ? lowHp && now() - hpSeenAt < 5000
             : hp.low || hp.ratio < (lowHp ? Math.min(0.9, config.lowHpRatio + 0.2) : config.lowHpRatio);
+        // 解除撤退要連續 HP_RECOVER_MS 都在門檻以上：實機無盡模式 HP 讀數 0.45 → 0.7 → 0.55 → 0.35 跳動，
+        // 一筆 0.7 就解除 → 立刻回去追目標衝進怪群 → 陣亡
+        if (lowHp && !nowLow && hp) {
+          if (recoverSince === null) recoverSince = now();
+          if (now() - recoverSince < HP_RECOVER_MS) nowLow = true;
+        } else recoverSince = null;
         if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
         const b = bossTracker.update(config.bossKite && deps.bossBar ? deps.bossBar() : 0, now());
         // 血條很久沒下降＝沒打到（首領在畫面外）→ 不風箏，照一般走位 / 追指示器去找它

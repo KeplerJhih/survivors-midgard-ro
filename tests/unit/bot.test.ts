@@ -139,6 +139,18 @@ describe('bot', () => {
     fill = 15;
     t += 500;
     bot.tick();
+    expect(bot.state.activity).toBe('retreat'); // 一筆回升不算，要連續 3 秒
+    fill = 11; // 讀數跳回 0.55 → 重新計時
+    t += 500;
+    bot.tick();
+    fill = 15;
+    for (let i = 0; i < 5; i++) {
+      t += 500;
+      bot.tick();
+      expect(bot.state.activity).toBe('retreat');
+    }
+    t += 1000;
+    bot.tick();
     expect(bot.state.activity).toBe('target');
   });
 
