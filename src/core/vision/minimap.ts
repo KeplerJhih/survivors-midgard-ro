@@ -149,7 +149,8 @@ export function findAltars(f: Frame, sq: Square): AltarMark[] {
     const id = ids[k]!;
     // 催眠師（實心紫圓＋螺旋，顏色接近 Niflheim）：填滿比例高 → 不是祭壇
     if (id === 'niflheim' && n / (bw * bh) > 0.6) continue;
-    if (out.some((o) => o.id === id && Math.hypot(o.x - (x0 + cx), o.y - (y0 + cy)) < discR)) continue;
+    // 同一座的圖示被切成幾塊（實機：Baldur 太陽的光芒報成 3 座）→ 兩個圓底半徑內合併
+    if (out.some((o) => o.id === id && Math.hypot(o.x - (x0 + cx), o.y - (y0 + cy)) < 2 * discR)) continue;
     out.push({ id, x: x0 + cx, y: y0 + cy, d: 2 * discR });
   }
   return out;
