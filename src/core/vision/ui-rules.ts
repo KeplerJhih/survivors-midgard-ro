@@ -80,6 +80,8 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   const cardRow = rows(cards, 0.05, 0.12)
     .filter((g) => g.length >= 2 && g.length <= 4)
     .filter((g) => bigPanels.some((p) => g.every((c) => inside(c, p, 0.03))))
+    // 卡片彼此相鄰（間距 ≤ 一張卡寬）：實機結算頁開了「傷害詳情」小視窗，左右兩邊露出的面板邊被當成兩張卡一直點
+    .filter((g) => g.every((c, k) => k === 0 || c.x0 - g[k - 1]!.x1 <= Math.max(rw(c), rw(g[k - 1]!))))
     .sort((a, b) => b.length - a.length)[0];
   if (cardRow) {
     const ranks = cardRow.map((c) => rarity(borderColor(f, c)));

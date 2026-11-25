@@ -297,6 +297,17 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeGreaterThan(0.9);
   });
 
+  it('相距很遠的兩張「卡」（小視窗兩側露出的面板邊）不是卡片列', () => {
+    const f = draw(GRASS, [
+      { x0: 0.064, y0: 0.01, x1: 0.934, y1: 0.989, fill: [225, 228, 236] },
+      { x0: 0.084, y0: 0.216, x1: 0.192, y1: 0.584, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.82, y0: 0.216, x1: 0.916, y1: 0.584, fill: PANEL, border: [189, 201, 230] },
+    ]);
+    const a = decide(f);
+    expect(a?.kind).not.toBe('start-skill');
+    expect(a?.kind).not.toBe('level-up');
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },
