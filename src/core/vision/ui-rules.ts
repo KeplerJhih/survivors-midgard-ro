@@ -156,18 +156,18 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   const grid = optionGrid(f, regions, buttons);
   if (grid) return tap('start-skill', grid);
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
-  const frag = bottomFragment(regions, buttons);
+  const frag = bottomFragment(regions);
   if (frag) return tap('modal', frag);
   return null;
 }
 
 /**
  * 實機：寶箱視窗的「繼續」只有兩個字，按鈕內部被文字切成小塊（寬 2.8%、高 3.5%），不像按鈕。
- * 條件：置中大面板（面積 15~60%、填滿率 ≥ 0.5；累積寶箱清單視窗高 89~98%、被分類成 card、填滿率 0.57~0.67）底部沒有偵測到按鈕
- * （清單中的列可能被認成按鈕，只看底部）；
- * 面板底部 15% 內、靠近中線（±10%）有小亮塊。
+ * 條件：置中大面板（面積 15~60%、填滿率 ≥ 0.5；累積寶箱清單視窗高 89~98%、被分類成 card、填滿率 0.57~0.67）；
+ * 面板底部 15% 內、靠近中線（±10%）的小塊取最右邊（底列可能是「全部販賣」按鈕＋小「繼續」，確認鍵在右）。
+ * 前面的規則都沒命中才會走到這裡。
  */
-function bottomFragment(regions: Region[], buttons: Region[]): Region | null {
+function bottomFragment(regions: Region[]): Region | null {
   const panel = regions.find(
     (r) =>
       (r.kind === 'panel' || r.kind === 'card') &&
@@ -179,7 +179,6 @@ function bottomFragment(regions: Region[], buttons: Region[]): Region | null {
   );
   if (!panel) return null;
   const bottom = panel.y1 - 0.15 * rh(panel);
-  if (buttons.some((b) => inside(b, panel, 0.01) && cy(b) >= bottom)) return null;
   return (
     regions
       .filter(
@@ -190,7 +189,7 @@ function bottomFragment(regions: Region[], buttons: Region[]): Region | null {
           Math.abs(cx(r) - cx(panel)) < 0.1 &&
           rw(r) * rh(r) < 0.01,
       )
-      .sort((a, b) => cy(b) - cy(a))[0] ?? null
+      .sort((a, b) => cx(b) - cx(a))[0] ?? null
   );
 }
 

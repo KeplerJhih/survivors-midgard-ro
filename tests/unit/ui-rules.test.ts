@@ -210,6 +210,18 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeGreaterThan(0.66);
   });
 
+  it('寶箱清單視窗：底部有「全部販賣」按鈕＋小「繼續」殘片 → 點右邊的繼續', () => {
+    const f = draw(GRASS, [
+      { x0: 0.263, y0: 0.124, x1: 0.738, y1: 0.874, fill: PANEL },
+      { x0: 0.431, y0: 0.816, x1: 0.525, y1: 0.851, fill: BTN, border: [90, 110, 200] },
+      { x0: 0.539, y0: 0.818, x1: 0.569, y1: 0.851, fill: BTN, border: [90, 110, 200] },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeGreaterThan(0.53);
+    expect(a.y).toBeGreaterThan(0.8);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },
