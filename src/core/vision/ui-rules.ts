@@ -68,6 +68,49 @@ export function decideByLayout(
   rarity: RarityRank = defaultRarity,
   opts: LayoutOptions = {},
 ): ScreenAction | null {
+  const act = decideCore(f, regions, rarity, opts);
+  if (act?.kind !== 'result') return act;
+  const keep = keepTiles(regions, f.width / f.height);
+  return keep.length ? { ...act, keep } : act;
+}
+
+/**
+ * 結算頁「帶回 Kafra 倉庫」物品格（ui/menus.gd _keep_section）：一排等大、近正方形的小格，遊戲已依評分由高到低排序。
+ * 實機（1568×713）：格高 0.069H、寬 0.03W（≈正方形）、16 格排一列。
+ * 倉庫已有同款的格子右上角有「x1」標籤，外框往上凸出 → 頂端比整排高出一截者排除（不靠顏色）。
+ */
+export function keepTiles(regions: Region[], aspect: number): { x: number; y: number }[] {
+  const cand = regions.filter((r) => {
+    const h = rh(r);
+    const ratio = (rw(r) * aspect) / h;
+    // 只看下半部：上方角色面板的技能圖示也是一排近正方形小圖
+    return r.y0 >= 0.55 && h >= 0.04 && h <= 0.11 && ratio >= 0.6 && ratio <= 1.5 && r.kind !== 'button';
+  });
+  // 以底邊分排，取最多格的一排（≥ 4 格、寬度相近）
+  const groups: Region[][] = [];
+  for (const r of cand) {
+    const g = groups.find((g) => Math.abs(g[0]!.y1 - r.y1) <= 0.012);
+    if (g) g.push(r);
+    else groups.push([r]);
+  }
+  const row = groups.filter((g) => g.length >= 4).sort((a, b) => b.length - a.length)[0];
+  if (!row) return [];
+  const ws = row.map(rw).sort((a, b) => a - b);
+  const medW = ws[ws.length >> 1]!;
+  const tops = row.map((r) => r.y0).sort((a, b) => a - b);
+  const medTop = tops[tops.length >> 1]!;
+  return row
+    .filter((r) => Math.abs(rw(r) - medW) <= medW * 0.35 && r.y0 >= medTop - 0.012)
+    .sort((a, b) => a.x0 - b.x0)
+    .map((r) => ({ x: cx(r), y: cy(r) }));
+}
+
+function decideCore(
+  f: Frame,
+  regions: Region[],
+  rarity: RarityRank,
+  opts: LayoutOptions,
+): ScreenAction | null {
   // 結算頁大面板：遊戲 UI 依畫面高度縮放 → 以「寬 / 高」判斷，與視窗比例無關。
   // 實機：16:9 時面板寬 0.92W（=1.64H），1568×713 寬畫面只有 0.71W（=1.56H）→ 原本「≥ 0.8W」認不出來，
   // Enter 備援按到預設焦點「選擇目的地」而換地圖。暫停選單約 0.93H → 門檻 1.2H 分得開

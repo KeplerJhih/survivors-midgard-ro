@@ -107,6 +107,8 @@ const MINIMAP_STUCK_MS = 2000;
 const ENTER_COOLDOWN = 3000;
 /** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
 const TAPS_BEFORE_ENTER = 3;
+/** 破關時免費帶回倉庫的件數（game_data.gd KEEP_WIN） */
+const KEEP_FREE = 3;
 /** 初始技能觸發遊戲設定同步的最短間隔（升級三張普通卡也會被判成初始技能） */
 const SYNC_REQUEST_GAP = 180000;
 const INTERVAL = { still: 1000, minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
@@ -145,6 +147,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let stillInRun: boolean | null = null;
   let lastEnter = -Infinity;
   let lastSyncRequest = -Infinity;
+  /** 這局打倒過 MVP（結算頁可免費帶 3 件回倉庫）、已帶幾件 */
+  let wonMvpThisRun = false;
+  let keepTaken = 0;
   let detourUntil = -Infinity;
   let detourDirs: Dir[] = [];
   let detourCw = false;
@@ -397,12 +402,24 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           act.kind !== 'result' &&
           !(act.kind === 'job' && config.jobPath === 'second');
         windowTaps++;
-        if (enter) {
+        // 破關（打倒過 MVP）的結算頁：先免費帶 3 件回 Kafra 倉庫（不帶就離開會被賣掉），再點再玩一次。
+        // 每格只點一次（再點一次＝取消保存）
+        const keep = act.kind === 'result' && wonMvpThisRun && act.keep ? act.keep : [];
+        const keepTile = keepTaken < KEEP_FREE ? keep[keepTaken] : undefined;
+        if (keepTile) {
+          keepTaken++;
+          log?.info('result: 帶回倉庫', keepTaken, keepTile);
+          void pointer.tap(keepTile.x, keepTile.y);
+        } else if (enter) {
           log?.info('screen: 點擊無效，改按 Enter', act);
           void keyboard.tap('enter');
         } else {
           log?.info('screen: 點擊', act);
           void pointer.tap(act.x, act.y);
+          if (act.kind === 'result') {
+            wonMvpThisRun = false; // 離開結算頁＝下一局重新計
+            keepTaken = 0;
+          }
         }
         // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步。
         // 升級三張普通卡也會被判成初始技能 → 限制頻率，避免對局中一直開暫停選單
@@ -483,6 +500,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       }
       // 低血量時撤退優先（實機：勝利選擇後回到地圖仍在找出口，HP 9% 照樣亂走）
       const exitSeek = mvpFight && !vitals.boss && !vitals.lowHp;
+      // 首領血條消失 5 秒以上才算打倒（短暫讀不到血條不算；沒打倒的結算頁帶回要付 zeny）
+      if (mvpFight && !vitals.boss && t - lastBossAt > 5000) wonMvpThisRun = true;
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
       const bossSeek = sense.bossSeek.get(t);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');

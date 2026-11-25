@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '@/core/vision/frame';
 import { parseLayout } from '@/core/vision/layout';
-import { decideByLayout } from '@/core/vision/ui-rules';
+import { decideByLayout, keepTiles } from '@/core/vision/ui-rules';
 
 type RGB = [number, number, number];
 const W = 640;
@@ -378,5 +378,25 @@ describe('寬畫面（1568×713）結算頁', () => {
     const a = decideByLayout(f, parseLayout(f))!;
     expect(a.kind).toBe('result');
     expect(a.x).toBeCloseTo(0.46, 1);
+  });
+});
+
+describe('結算頁帶回 Kafra 倉庫物品格', () => {
+  // 實機 1568×713（640 取樣）：16 格中切出 14 格；第 8 格右上有「x1」標籤（倉庫已有）→ 外框往上凸
+  const tile = (x0: number, x1: number, y0 = 0.763) => ({ kind: 'other' as const, x0, y0, x1, y1: 0.832, fill: 0.65, luma: 230 });
+  const regions = [
+    tile(0.194, 0.225), tile(0.233, 0.263), tile(0.272, 0.302), tile(0.309, 0.344), tile(0.348, 0.378),
+    tile(0.388, 0.417), tile(0.425, 0.459), tile(0.464, 0.494), tile(0.498, 0.544, 0.732),
+    tile(0.541, 0.575), tile(0.58, 0.609),
+  ];
+  it('由左到右、排除倉庫已有的那格', () => {
+    const k = keepTiles(regions, 1568 / 713);
+    expect(k.length).toBe(10);
+    expect(k[0]!.x).toBeCloseTo(0.21, 2);
+    expect(k.some((t) => t.x > 0.5 && t.x < 0.53)).toBe(false);
+  });
+  it('上半部的技能圖示列不算', () => {
+    const icons = [0.3, 0.34, 0.38, 0.42, 0.46].map((x) => ({ kind: 'other' as const, x0: x, y0: 0.3, x1: x + 0.03, y1: 0.36, fill: 0.6, luma: 200 }));
+    expect(keepTiles(icons, 1568 / 713)).toEqual([]);
   });
 });

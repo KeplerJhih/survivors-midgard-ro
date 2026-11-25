@@ -877,3 +877,53 @@ describe('勝利後出口光時有時無', () => {
     expect(bot.state.dirs).toEqual([]); // 原地等，不亂走
   });
 });
+
+describe('破關結算頁帶回 3 件', () => {
+  const setup = (won: boolean) => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    let result = false;
+    const taps: number[] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const keep = [0.21, 0.25, 0.29, 0.33].map((x) => ({ x, y: 0.8 }));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => null,
+        detectScreen: () => (result ? { kind: 'result', x: 0.47, y: 0.94, keep } : null),
+        pointer: { tap: async (x) => void taps.push(x) },
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(4000);
+    if (won) {
+      bar = 0.003;
+      for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+      bar = 0;
+      run(8000);
+    }
+    result = true;
+    run(15000);
+    return taps;
+  };
+  it('打倒過 MVP → 先點前 3 格，再點再玩一次', () => {
+    expect(setup(true).slice(0, 4)).toEqual([0.21, 0.25, 0.29, 0.47]);
+  });
+  it('沒打倒 MVP（帶回要付 zeny）→ 直接點再玩一次', () => {
+    expect(setup(false)[0]).toBe(0.47);
+  });
+});

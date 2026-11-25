@@ -34,6 +34,8 @@ export interface ScreenAction {
   /** 要點擊的位置（0~1） */
   x: number;
   y: number;
+  /** 結算頁「帶回 Kafra 倉庫」物品格（由左到右、已排除倉庫已有的），破關時免費帶 3 件 */
+  keep?: { x: number; y: number }[];
 }
 
 const isLight = (r: number, g: number, b: number) =>
