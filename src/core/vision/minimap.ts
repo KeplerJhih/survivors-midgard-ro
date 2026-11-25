@@ -71,67 +71,86 @@ function glyphDist(r: number, g: number, b: number, c: [number, number, number])
   return Math.min(d1, d2);
 }
 
-/** 在小地圖方框內找祭壇標記並辨識是哪一座 */
+/**
+ * 在小地圖方框內找祭壇標記並辨識是哪一座。
+ * 先找各祭壇圖示色的像素團，再確認周圍有深色圓底：圓底常被玩家箭頭、相鄰標記切碎
+ * （實機 2160 寬：兩個標記疊在箭頭旁，圓底碎成 5 塊、每塊都太小）→ 不要求圓底完整。
+ */
 export function findAltars(f: Frame, sq: Square): AltarMark[] {
   const { width: W, data } = f;
   const side = sq.x1 - sq.x0;
-  const minD = 0.05 * side;
-  const maxD = 0.16 * side;
   const x0 = Math.max(0, Math.floor(sq.x0)), x1 = Math.min(W, Math.ceil(sq.x1));
   const y0 = Math.max(0, Math.floor(sq.y0)), y1 = Math.min(f.height, Math.ceil(sq.y1));
   const w = x1 - x0, h = y1 - y0;
   if (w <= 0 || h <= 0) return [];
   const at = (x: number, y: number) => ((y0 + y) * W + x0 + x) * 4;
+  const ids = Object.keys(ALTAR_COLORS) as AltarId[];
+  // 每個像素最接近的圖示色（距離 < 16）
+  const label = new Int8Array(w * h).fill(-1);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = at(x, y);
+      const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+      // 圖示色都有一點飽和度（Odin 偏藍白 max-min=25）；灰白面板（實機 (239,240,245)）不算
+      if (Math.max(r, g, b) < 100 || Math.max(r, g, b) - Math.min(r, g, b) < 18) continue;
+      let bd = 16;
+      for (let k = 0; k < ids.length; k++) {
+        const dd = glyphDist(r, g, b, ALTAR_COLORS[ids[k]!]);
+        if (dd < bd) (bd = dd), (label[y * w + x] = k);
+      }
+    }
+  const minN = Math.max(6, (0.011 * side) ** 2);
+  const discR = 0.06 * side; // 圓底半徑（實機直徑 ≈ 0.095 邊長）
   const seen = new Uint8Array(w * h);
   const out: AltarMark[] = [];
   for (let s = 0; s < w * h; s++) {
-    if (seen[s]) continue;
-    const sx = s % w, sy = (s / w) | 0;
-    const i0 = at(sx, sy);
-    if (!isAltarDisc(data[i0]!, data[i0 + 1]!, data[i0 + 2]!)) continue;
+    const k = label[s]!;
+    if (k < 0 || seen[s]) continue;
     seen[s] = 1;
     const stack = [s];
-    let mnx = w, mxx = 0, mny = h, mxy = 0;
+    let n = 0, sx = 0, sy = 0, mnx = w, mxx = 0, mny = h, mxy = 0;
     while (stack.length) {
       const p = stack.pop()!;
       const x = p % w, y = (p / w) | 0;
+      n++;
+      sx += x;
+      sy += y;
       if (x < mnx) mnx = x;
       if (x > mxx) mxx = x;
       if (y < mny) mny = y;
       if (y > mxy) mxy = y;
-      for (const q of [p - 1, p + 1, p - w, p + w]) {
-        if (q < 0 || q >= w * h || seen[q]) continue;
-        if (Math.abs((q % w) - x) > 1) continue;
-        const i = at(q % w, (q / w) | 0);
-        if (!isAltarDisc(data[i]!, data[i + 1]!, data[i + 2]!)) continue;
-        seen[q] = 1;
-        stack.push(q);
-      }
+      // 8 鄰、容許 1 px 斷開（圖示有白色描邊、抗鋸齒）
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+          const q = ny * w + nx;
+          if (seen[q] || label[q] !== k) continue;
+          seen[q] = 1;
+          stack.push(q);
+        }
     }
     const bw = mxx - mnx + 1, bh = mxy - mny + 1;
-    if (bw < minD || bh < minD || bw > maxD || bh > maxD || bw / bh < 0.7 || bw / bh > 1.4) continue;
-    // 圓底內的圖示像素：依顏色投票
-    const counts = new Map<AltarId, number>();
-    const ix0 = mnx + Math.round(bw * 0.15), ix1 = mxx - Math.round(bw * 0.15);
-    const iy0 = mny + Math.round(bh * 0.15), iy1 = mxy - Math.round(bh * 0.15);
-    for (let y = iy0; y <= iy1; y++)
-      for (let x = ix0; x <= ix1; x++) {
+    if (n < minN || bw > 2.2 * discR || bh > 2.2 * discR) continue;
+    const cx = sx / n, cy = sy / n;
+    // 周圍要有深色圓底
+    let disc = 0, tot = 0;
+    const R = Math.ceil(discR);
+    for (let dy = -R; dy <= R; dy++)
+      for (let dx = -R; dx <= R; dx++) {
+        if (dx * dx + dy * dy > R * R) continue;
+        const x = Math.round(cx + dx), y = Math.round(cy + dy);
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        tot++;
         const i = at(x, y);
-        const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
-        let best: AltarId | null = null;
-        let bd = 16;
-        for (const id of Object.keys(ALTAR_COLORS) as AltarId[]) {
-          const d = glyphDist(r, g, b, ALTAR_COLORS[id]);
-          if (d < bd) (bd = d), (best = id);
-        }
-        if (best) counts.set(best, (counts.get(best) ?? 0) + 1);
+        if (isAltarDisc(data[i]!, data[i + 1]!, data[i + 2]!)) disc++;
       }
-    const inner = (ix1 - ix0 + 1) * (iy1 - iy0 + 1);
-    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-    if (!top || top[1] < Math.max(4, inner * 0.03)) continue;
-    // 催眠師（實心紫圓＋螺旋，顏色接近 Niflheim）：紫色填滿比例高 → 不是祭壇
-    if (top[0] === 'niflheim' && top[1] / inner > 0.35) continue;
-    out.push({ id: top[0], x: x0 + mnx + bw / 2, y: y0 + mny + bh / 2, d: (bw + bh) / 2 });
+    if (disc < tot * 0.08) continue;
+    const id = ids[k]!;
+    // 催眠師（實心紫圓＋螺旋，顏色接近 Niflheim）：填滿比例高 → 不是祭壇
+    if (id === 'niflheim' && n / (bw * bh) > 0.6) continue;
+    if (out.some((o) => o.id === id && Math.hypot(o.x - (x0 + cx), o.y - (y0 + cy)) < discR)) continue;
+    out.push({ id, x: x0 + cx, y: y0 + cy, d: 2 * discR });
   }
   return out;
 }

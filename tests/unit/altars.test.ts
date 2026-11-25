@@ -36,10 +36,29 @@ describe('findAltars（小地圖祭壇標記）', () => {
     expect(list[0]!.d).toBeGreaterThan(25);
   });
 
+  it('圓底被玩家箭頭切斷、兩個標記相鄰（實機 2160 寬）仍認得出', () => {
+    const f = frame((set) => {
+      disc(set, 150, 150);
+      cross(set, 150, 150, ALTAR_COLORS.hel);
+      disc(set, 172, 150);
+      // 玩家箭頭（紅）壓過兩個圓底中間
+      for (let y = 130; y <= 170; y++) for (let x = 158; x <= 165; x++) set(x, y, [255, 38, 25]);
+    });
+    expect(findAltars(f, SQ).map((a) => a.id)).toEqual(['hel']);
+  });
+
   it('催眠師（實心紫圓，顏色接近 Niflheim）不當成祭壇', () => {
     const f = frame((set) => {
       disc(set, 150, 150);
       for (let y = -10; y <= 10; y++) for (let x = -10; x <= 10; x++) if (x * x + y * y <= 100) set(150 + x, 150 + y, [172, 107, 232]);
+    });
+    expect(findAltars(f, SQ)).toEqual([]);
+  });
+
+  it('灰白面板＋深色字（小地圖外框、標題）不當成 Odin', () => {
+    const f = frame((set) => {
+      for (let y = 60; y < 120; y++) for (let x = 60; x < 200; x++) set(x, y, [239, 240, 245]);
+      for (let y = 85; y < 95; y++) for (let x = 80; x < 180; x += 3) set(x, y, [20, 20, 32]);
     });
     expect(findAltars(f, SQ)).toEqual([]);
   });
