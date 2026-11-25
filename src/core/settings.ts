@@ -25,6 +25,8 @@ export interface BotConfig {
   jobPath: 'first' | 'second';
   /** 自動前往觸發的祭壇（每座都有代價，預設只開沒有代價的 Yggdrasil） */
   altars: Partial<Record<AltarId, boolean>>;
+  /** 走向地上貴重掉落物的光柱（卡片等；吸取範圍小，要走到旁邊才撿得到） */
+  seekLoot: boolean;
 }
 
 /** 遊戲內的勾選設定：on/off 由外掛在暫停選單同步，keep 不動 */
@@ -71,6 +73,7 @@ export const DEFAULT_SETTINGS: Settings = {
     autoContinue: true,
     jobPath: 'first',
     altars: { yggdrasil: true },
+    seekLoot: true,
   },
 };
 

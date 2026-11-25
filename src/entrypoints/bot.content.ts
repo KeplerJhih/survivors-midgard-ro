@@ -18,6 +18,7 @@ import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
 import { approachExit, approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { clockGlyph } from '@/core/vision/clock';
+import { approachBeam } from '@/core/vision/loot';
 import { bossBar, readHp } from '@/core/vision/hud';
 import { findMinimapSquare, MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
 
@@ -104,6 +105,10 @@ export default defineContentScript({
         return frame ? approachExit(frame) : null;
       },
       stillFrame: sample,
+      approachLoot: () => {
+        const frame = sample();
+        return frame ? approachBeam(frame) : null;
+      },
       fleeSwirl: () => {
         const frame = sample();
         return frame ? fleeSwirl(frame) : null;

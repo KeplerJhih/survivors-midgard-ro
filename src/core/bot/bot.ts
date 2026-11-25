@@ -72,6 +72,8 @@ export interface BotDeps {
   approachSwirl?: () => Dir[] | null;
   /** MVP 勝利後走向淡藍出口 */
   approachExit?: () => Dir[] | null;
+  /** 走向地上掉落物光柱（卡片等）的方向 */
+  approachLoot?: () => Dir[] | null;
   /** 低解析度整張畫面（靜止偵測：辨識不到的視窗讓遊戲暫停時按 Enter） */
   stillFrame?: () => Frame | null;
   /** 遊戲內設定同步（暫停選單勾選框）；需要時 bot 會暫停其他行為 */
@@ -313,6 +315,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       },
       null as Dir[] | null,
     ),
+    loot: throttle(INTERVAL.swirl, () => (config.seekLoot && deps.approachLoot ? deps.approachLoot() : null), null as Dir[] | null),
     object: throttle(
       INTERVAL.object,
       () => (config.seekObjects && deps.findObjects ? objectSeeker.update(deps.findObjects(), now()) : null),
@@ -341,6 +344,25 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     if (t - lastExit.at < EXIT_COAST_MS) return lastExit.dirs;
     if (t - lastExit.at < EXIT_WAIT_MS) return [];
     return null;
+  };
+
+  /** 掉落物光柱：追超過 8 秒（走不到、地形擋住）就放棄 10 秒，避免一直卡在同一處 */
+  let lootSince: number | null = null;
+  let lootPauseUntil = -Infinity;
+  const lootStep = (t: number): Dir[] | null => {
+    if (t < lootPauseUntil) return null;
+    const d = sense.loot.get(t);
+    if (!d) {
+      lootSince = null;
+      return null;
+    }
+    if (lootSince === null) lootSince = t;
+    if (t - lootSince > 8000) {
+      lootPauseUntil = t + 10000;
+      lootSince = null;
+      return null;
+    }
+    return d;
   };
 
   /** 入口在畫面外又沒有指示器（暗色地圖指示圓盤與地形連成一片）→ 依小地圖走回入口剛開時的位置，入口就會回到畫面上 */
@@ -540,7 +562,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
       const altar = busy || bossSeek ? null : seekAltar(t);
       const target = busy ? null : bossSeek ?? altar ?? sense.target.get(t);
-      const object = busy || target ? null : sense.object.get(t);
+      const object = busy || target ? null : (lootStep(t) ?? sense.object.get(t));
       const elapsed = t - startedAt;
       const { activity, want: decided } = decide(
         {
