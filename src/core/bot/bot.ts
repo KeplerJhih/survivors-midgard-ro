@@ -152,6 +152,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let mmChangedAt = -Infinity;
   /** 祭壇：最近讀到的小地圖、目前要去的祭壇與放棄清單 */
   let mmLast: MinimapRead | null = null;
+  /** 時間剛停住（入口剛開）時玩家在小地圖上的位置：入口一定生在這附近 4~6.5 單位內（mvp_raid.gd _portal_point） */
+  let portalHome: { x: number; y: number } | null = null;
+  let wasFrozen = false;
   let altarGoal: { id: string; x: number; y: number; since: number } | null = null;
   const altarGiveUp: { x: number; y: number; until: number }[] = [];
 
@@ -279,6 +282,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
+  };
+
+  /** 入口在畫面外又沒有指示器（暗色地圖指示圓盤與地形連成一片）→ 依小地圖走回入口剛開時的位置，入口就會回到畫面上 */
+  const backToPortalHome = (): Dir[] | null => {
+    if (!portalHome || !mmLast) return null;
+    return navigator.steer(mmLast.player, portalHome, 4);
   };
 
   /**
@@ -417,6 +426,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const portal = sense.portal.get(t);
       const frozen = sense.frozen.get(t);
       state.frozen = frozen;
+      if (frozen && !wasFrozen && !mvpFight) portalHome = mmLast && t - mmSeenAt < 1500 ? { ...mmLast.player } : null;
+      if (!frozen) portalHome = null;
+      wasFrozen = frozen;
       // 時間停住期間打過首領＝在 MVP 巢穴裡（入口開著時一般怪物會被清掉，不會有首領）→ 勝利後找淡藍出口。
       // 實機：無盡模式勝利後巢穴內時鐘恢復走動 → 不能靠「停住」判斷，改成首領消失後 30 秒內都找出口
       if (vitals.boss) {
@@ -447,7 +459,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           approach: exitSeek
             ? (sense.pointer.get(t) ?? sense.exit.get(t))
             : frozen && !vitals.boss
-              ? (sense.pointer.get(t) ?? sense.approach.get(t))
+              ? (sense.pointer.get(t) ?? sense.approach.get(t) ?? backToPortalHome())
               : null,
           flee: frozen || exitSeek ? null : sense.swirl.get(t),
           danger: sense.danger.get(t),

@@ -143,3 +143,20 @@ describe('findPortalGlow 排除區（實機 Payon Forest 寬畫面）', () => {
     expect(g.y).toBeGreaterThan(0);
   });
 });
+
+describe('findPortalGlow：紫色入口與藍色火焰', () => {
+  const W = 160, H = 73;
+  const frame = (x: number, y: number, rgb: [number, number, number]) => {
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i++) data.set([60, 70, 60, 255], i * 4);
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) data.set([...rgb, 255], ((Math.round(y * H) + dy) * W + Math.round(x * W) + dx) * 4);
+    return { width: W, height: H, data };
+  };
+  it('紫色入口光（R 高）找得到', () => {
+    expect(findPortalGlow(frame(0.3, 0.4, [191, 77, 255]))).not.toBeNull();
+  });
+  it('藍色火焰（R 低）不算', () => {
+    expect(findPortalGlow(frame(0.3, 0.4, [45, 138, 255]))).toBeNull();
+  });
+});

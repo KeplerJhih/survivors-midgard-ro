@@ -138,7 +138,9 @@ export function approachSwirl(f: Frame): Dir[] | null {
 const isPortalGlow = (r: number, g: number, b: number) => {
   const mx = Math.max(r, g, b);
   if (mx < 220 || mx - Math.min(r, g, b) < 90) return false;
-  return !(b > r + 30 && b > g + 10); // 藍色火焰
+  // 藍色火焰（實機 (45,138,255)、(35,104,230)，R 很低）；紫色傳送門（Baphomet 等 (191,77,255)）R 高 → 不排除
+  // 實機：原本「B 明顯大於 R、G」把紫色入口光一併排除，入口開在旁邊也找不到
+  return !(b > r + 30 && b > g + 10 && r < 120);
 };
 
 /**

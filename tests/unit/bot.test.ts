@@ -677,3 +677,44 @@ describe('祭壇', () => {
     expect(acts.filter((a) => a === 'target')).toEqual([]);
   });
 });
+
+describe('入口開著、畫面上找不到入口（暗色地圖）', () => {
+  it('依小地圖留在入口剛開時的位置附近（入口生在 4~6.5 單位內）', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let p = { x: 100, y: 100 };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'flower', circlePeriodMs: 30000 },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        approachSwirl: () => null,
+        readMinimap: () => ({ player: { ...p }, boss: null, altars: [] }),
+      },
+    );
+    let home = { x: 0, y: 0 };
+    let maxAway = 0;
+    for (; t < 60000; t += 100) {
+      if (t === 20000) {
+        frozenClock = true;
+      }
+      bot.tick();
+      if (t === 24000) home = { ...p };
+      const held = bot.state.dirs;
+      p = {
+        x: p.x + ((held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0)) * 0.3,
+        y: p.y - ((held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0)) * 0.3,
+      };
+      if (t > 30000) maxAway = Math.max(maxAway, Math.hypot(p.x - home.x, p.y - home.y));
+    }
+    expect(bot.state.frozen).toBe(true);
+    expect(maxAway).toBeLessThan(15);
+  });
+});
