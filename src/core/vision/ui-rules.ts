@@ -118,6 +118,15 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     const p = container(bottom);
     if (p && rw(p) >= 0.8) return tap('result', bottom[bottom.length === 4 ? 1 : 0]!);
   }
+  // 結算（無盡模式「你倒下了」）：4 顆中間兩顆（再玩一次、前往城鎮）邊框淡、切不出來，只剩頭尾兩顆、中間空很大
+  // （實機：0.361~0.422 與 0.588~0.639）→ 點空隙前 1/4（再玩一次，實際 0.43~0.49）
+  if (bottom && bottom.length === 2 && cy(bottom[0]!) >= 0.85) {
+    const p = container(bottom);
+    const [a, b] = bottom as [Region, Region];
+    const gap = b.x0 - a.x1;
+    if (p && rw(p) >= 0.8 && gap > 1.5 * ((rw(a) + rw(b)) / 2))
+      return { kind: 'result', x: a.x1 + gap * 0.25, y: cy(a) };
+  }
   if (bottom && bottom.length === 2) {
     // 不限置中：任務 NPC 視窗在左側（[先不要][我來幫忙！]）
     const p = container(bottom);

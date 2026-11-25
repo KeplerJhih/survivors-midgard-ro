@@ -270,6 +270,20 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeLessThan(0.56);
   });
 
+  it('無盡模式結算：底排只切出頭尾兩顆 → 點空隙前 1/4（再玩一次）', () => {
+    const f = draw([60, 70, 90], [
+      { x0: 0.075, y0: 0.02, x1: 0.925, y1: 0.985, fill: PANEL },
+      { x0: 0.333, y0: 0.211, x1: 0.62, y1: 0.566, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.633, y0: 0.211, x1: 0.906, y1: 0.566, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.361, y0: 0.93, x1: 0.422, y1: 0.97, fill: BTN, border: [90, 110, 200] },
+      { x0: 0.588, y0: 0.93, x1: 0.639, y1: 0.97, fill: BTN, border: [90, 110, 200] },
+    ]);
+    const a = decide(f)!;
+    expect(a.kind).toBe('result');
+    expect(a.x).toBeGreaterThan(0.43);
+    expect(a.x).toBeLessThan(0.49);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },
