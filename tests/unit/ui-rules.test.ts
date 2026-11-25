@@ -222,6 +222,20 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeGreaterThan(0.8);
   });
 
+  it('等級要轉給誰：大面板內一堆等寬小卡、沒按鈕 → 點左上第一張', () => {
+    const tiles = [0.066, 0.192, 0.319, 0.442, 0.569, 0.698, 0.825].map((x0) => ({ x0, y0: 0.27, x1: x0 + 0.11, y1: 0.42, fill: PANEL, border: [189, 201, 230] as RGB }));
+    const f = draw(GRASS, [
+      { x0: 0.025, y0: 0.161, x1: 0.975, y1: 0.837, fill: [225, 228, 236] },
+      ...tiles,
+      { x0: 0.381, y0: 0.44, x1: 0.492, y1: 0.59, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.508, y0: 0.44, x1: 0.619, y1: 0.59, fill: PANEL, border: [189, 201, 230] },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeCloseTo(0.12, 1);
+    expect(a.y).toBeCloseTo(0.345, 1);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },

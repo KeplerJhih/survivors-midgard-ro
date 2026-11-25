@@ -155,10 +155,31 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   // 選項格（初始技能等）：同一大區塊內 ≥2 個等大、無按鈕的面板 → 點「與眾不同」的那張（上次選擇有不同色帶），否則第一張
   const grid = optionGrid(f, regions, buttons);
   if (grid) return tap('start-skill', grid);
+  // 小卡格（被催眠「等級要轉給誰？」：一個大面板裡 ≥5 張等寬小卡、沒有按鈕）→ 點左上第一張
+  const tile = tileGrid(regions);
+  if (tile) return tap('start-skill', tile);
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
   const frag = bottomFragment(regions);
   if (frag) return tap('modal', frag);
   return null;
+}
+
+/**
+ * 實機（被催眠師螺旋忘掉技能後）：「你腦中一片空白：等級要轉給誰？」全寬面板（面積 ~0.64）內 10~12 張小技能卡
+ * （寬 ~0.11、高 0.12~0.15，圖示把卡片頂端切開所以高度不一，分類為 other），沒有按鈕。點左上第一張即可。
+ */
+function tileGrid(regions: Region[]): Region | null {
+  const box = regions.find((r) => (r.kind === 'panel' || r.kind === 'card') && rw(r) * rh(r) >= 0.3);
+  if (!box) return null;
+  const tiles = regions.filter(
+    (r) => r !== box && r.kind !== 'button' && inside(r, box, 0.01) && rw(r) >= 0.06 && rw(r) <= 0.2 && rh(r) >= 0.08 && rh(r) <= 0.25,
+  );
+  if (tiles.length < 5) return null;
+  const widths = tiles.map(rw).sort((a, b) => a - b);
+  const median = widths[widths.length >> 1]!;
+  const same = tiles.filter((r) => Math.abs(rw(r) - median) <= 0.02);
+  if (same.length < 5) return null;
+  return [...same].sort((a, b) => (Math.abs(a.y1 - b.y1) > 0.05 ? a.y1 - b.y1 : a.x0 - b.x0))[0]!;
 }
 
 /**
