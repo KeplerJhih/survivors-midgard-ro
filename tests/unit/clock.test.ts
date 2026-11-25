@@ -32,6 +32,15 @@ describe('createFreezeDetector', () => {
     expect(d.update(glyph(50), t + 1000)).toBe(true);
   });
 
+  it('載入畫面（沒有字）不重置：之後時鐘一直停在同一個數字 → 判定停住', () => {
+    const d = createFreezeDetector(3000);
+    let t = 0;
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(s), t);
+    for (let i = 0; i < 3; i++, t += 1000) d.update(new Uint8Array(300), t); // 載入畫面
+    for (let i = 0; i < 4; i++, t += 1000) d.update(glyph(3), t); // 巢穴內時鐘停在原本的數字
+    expect(d.update(glyph(3), t)).toBe(true);
+  });
+
   it('時鐘在走時長時間讀不到（圖示壓住小地圖邊框）不會變成停住；讀不到超過 5 秒停住狀態也解除', () => {
     const d = createFreezeDetector(3000);
     let t = 0;

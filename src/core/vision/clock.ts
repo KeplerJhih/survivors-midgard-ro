@@ -47,15 +47,12 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
       nowT = now;
       // 讀不到（實機：角色/首領圖示壓在小地圖下緣，方框找不到）：沿用上次結果；
       // 超過 5 秒都讀不到就當沒停住（原本用「上次變化至今」判斷，讀不到 3 秒就誤判停住）
-      if (!glyph) return now - seenAt <= 5000 ? state : false;
-      seenAt = now;
       let on = 0;
-      for (let i = 0; i < glyph.length; i++) on += glyph[i]!;
-      if (on < 10) {
-        last = null;
-        ticked = false;
-        return (state = false);
-      }
+      if (glyph) for (let i = 0; i < glyph.length; i++) on += glyph[i]!;
+      // 沒有字（載入畫面、視窗遮住）也當讀不到，不重置「看過走動」：
+      // 實機：進 MVP 巢穴的載入畫面把狀態清掉，之後時鐘一直停在 11:00 → 永遠判定不出停住 → 勝利後不知道在巢穴裡
+      if (!glyph || on < 10) return now - seenAt <= 5000 ? state : false;
+      seenAt = now;
       if (last && last.length === glyph.length) {
         let d = 0;
         for (let i = 0; i < glyph.length; i++) d += glyph[i]! ^ last[i]!;
