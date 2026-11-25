@@ -155,6 +155,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   /** 時間剛停住（入口剛開）時玩家在小地圖上的位置：入口一定生在這附近 4~6.5 單位內（mvp_raid.gd _portal_point） */
   let portalHome: { x: number; y: number } | null = null;
   let wasFrozen = false;
+  /** 巢穴內（時間停著）點過對話框：時鐘恢復走動＝回到地圖 → 不必再找出口 */
+  let lairDialog = false;
   let altarGoal: { id: string; x: number; y: number; since: number } | null = null;
   const altarGiveUp: { x: number; y: number; until: number }[] = [];
 
@@ -349,7 +351,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       if (act && pointer) {
         state.screenTaps++;
         // 點過勝利選擇 / 結算 / 初始技能＝已離開巢穴，不再找出口（寶箱等 modal 不算：勝利後巢穴內也會跳）
-        if (act.kind === 'dialog' || act.kind === 'result' || act.kind === 'start-skill') mvpFight = false;
+        // 時間還停著＝還在巢穴裡：勝利後巢穴內也會跳對話框（實機：點掉後當成「入口開著」去追任何亮光 →
+        // 走進金色 Valhalla 因果路線傳送門）→ 不清除，繼續只找出口
+        if (act.kind === 'dialog' || act.kind === 'result' || act.kind === 'start-skill') {
+          if (state.frozen) lairDialog = true;
+          else mvpFight = false;
+        }
         state.lastScreen = act.kind;
         // 點了幾次視窗還在（畫面大小不同時按鈕位置可能算偏）→ 與點擊交替按 Enter（預設焦點按鈕）。
         // 腐化寶箱（預設焦點 Hel）、結算頁（焦點不一定是再玩一次）、轉職選右邊（預設焦點是左邊）不按
@@ -433,10 +440,16 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 實機：無盡模式勝利後巢穴內時鐘恢復走動 → 不能靠「停住」判斷，改成首領消失後 30 秒內都找出口
       if (vitals.boss) {
         lastBossAt = t;
-        if (frozen) mvpFight = true;
+        if (frozen) {
+          mvpFight = true;
+          portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
+        }
       }
       // 時間還停著＝還在巢穴裡（非無盡模式勝利後時鐘不會走）→ 繼續找出口，不因時限放棄
-      else if (t - lastBossAt > EXIT_WINDOW && !frozen) mvpFight = false;
+      else if ((t - lastBossAt > EXIT_WINDOW || lairDialog) && !frozen) {
+        mvpFight = false;
+        lairDialog = false;
+      }
       // 低血量時撤退優先（實機：勝利選擇後回到地圖仍在找出口，HP 9% 照樣亂走）
       const exitSeek = mvpFight && !vitals.boss && !vitals.lowHp;
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;

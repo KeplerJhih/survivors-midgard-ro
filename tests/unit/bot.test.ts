@@ -718,3 +718,46 @@ describe('入口開著、畫面上找不到入口（暗色地圖）', () => {
     expect(maxAway).toBeLessThan(15);
   });
 });
+
+describe('巢穴勝利後點掉對話框', () => {
+  it('時間還停著：仍只找出口，不追其他亮光（因果路線傳送門）', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    let dialog = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        detectScreen: () => (dialog ? { kind: 'dialog', x: 0.5, y: 0.5 } : null),
+        pointer: { tap: async () => void (dialog = false) },
+        approachExit: () => null,
+        approachSwirl: () => ['right'], // 金色因果路線傳送門的光
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(5000);
+    frozenClock = true;
+    run(5000);
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    dialog = true;
+    run(3000);
+    run(5000);
+    expect(bot.state.frozen).toBe(true);
+    expect(bot.state.dirs).not.toEqual(['right']);
+    expect(bot.state.activity).not.toBe('enter');
+  });
+});
