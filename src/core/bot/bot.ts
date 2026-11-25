@@ -19,6 +19,10 @@ import type { GameSync } from './game-sync';
 import { throttle } from './throttle';
 
 const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
+const TURN: Record<'cw' | 'ccw', Record<Dir, Dir>> = {
+  cw: { up: 'right', right: 'down', down: 'left', left: 'up' },
+  ccw: { up: 'left', left: 'down', down: 'right', right: 'up' },
+};
 
 export interface BotState {
   running: boolean;
@@ -81,6 +85,11 @@ const EXIT_WINDOW = 30000;
 const HP_RECOVER_MS = 3000;
 /** 對局中畫面靜止多久（且沒辨識到視窗）→ 按 Enter 觸發視窗的預設焦點按鈕 */
 const STILL_MS = 4000;
+/** 畫面靜止時，時鐘須在這段時間內還在走，才算「視窗跳出讓遊戲暫停」 */
+const STILL_CLOCK_GAP = 4000;
+/** 走向傳送門時畫面靜止多久＝撞牆 → 往側邊繞 DETOUR_MS */
+const STUCK_MS = 1500;
+const DETOUR_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
 /** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
@@ -123,6 +132,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let stillInRun: boolean | null = null;
   let lastEnter = -Infinity;
   let lastSyncRequest = -Infinity;
+  let detourUntil = -Infinity;
+  let detourDirs: Dir[] = [];
+  let detourCw = false;
+  let detourStreak = 0;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -294,10 +307,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       }
 
       // 辨識不到的視窗（畫面大小不同、新視窗）：對局中畫面突然整個靜止 → 遊戲被視窗暫停 → 按 Enter。
-      // 只在靜止開始時時鐘還在走才算（城鎮、載入畫面不按：城鎮 Enter 會開聊天）
+      // 只在靜止開始時時鐘「剛剛」還在走才算：視窗跳出時時鐘與畫面同時停下。
+      // 城鎮、載入畫面（時鐘沒走過）不按（城鎮 Enter 會開聊天）；MVP 入口開著時時鐘早就停了、怪物被清空，
+      // 角色撞牆時畫面也會靜止（實機：誤按 Enter）→ 時鐘停下超過 STILL_CLOCK_GAP 才靜止的不算
       const stillSince = sense.still.get(t);
       if (stillSince === null) stillInRun = null;
-      else if (stillInRun === null) stillInRun = clock.ticking;
+      else if (stillInRun === null) stillInRun = clock.ticking && t - clock.changedAt < STILL_CLOCK_GAP;
       if (!seen && !deps.gameSync?.busy && stillInRun && stillSince !== null && t - stillSince >= STILL_MS && t - lastEnter >= ENTER_COOLDOWN) {
         lastEnter = t;
         state.screenTaps++;
@@ -333,19 +348,40 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const target = busy ? null : bossSeek ?? sense.target.get(t);
       const object = busy || target ? null : sense.object.get(t);
       const elapsed = t - startedAt;
-      const { activity, want } = decide(
+      const { activity, want: decided } = decide(
         {
           portal,
           target,
           object,
           frozen: frozen || exitSeek,
-          approach: exitSeek ? sense.exit.get(t) : frozen && !vitals.boss ? sense.approach.get(t) : null,
+          // 入口開著（時間停住、沒首領）：畫面上的入口光優先；傳送門在畫面外時改追邊緣指示器
+          // （ui/chest_pointer.gd：傳送門圓盤半徑 24 比寶箱 19 大，排序優先；與顏色無關）。
+          // 實機：原本時間停住就不看指示器，傳送門在畫面外只能靠走位碰運氣
+          approach: exitSeek
+            ? sense.exit.get(t)
+            : frozen && !vitals.boss
+              ? (sense.approach.get(t) ?? sense.target.get(t))
+              : null,
           flee: frozen || exitSeek ? null : sense.swirl.get(t),
           danger: sense.danger.get(t),
           ...vitals,
         },
         { patrol: moves.patrol(elapsed), retreat: moves.retreat(elapsed), kite: moves.kite(elapsed) },
       );
+      // 走向傳送門 / 出口時撞牆（實機：下水道地圖直線走過去被牆擋住、畫面不動）→ 轉 90° 繞一段再回來，左右輪流
+      let want = decided;
+      if (activity === 'enter') {
+        if (t < detourUntil) want = detourDirs;
+        else if (stillSince !== null && t - stillSince >= STUCK_MS && want.length) {
+          // 連續卡住（上次繞完 10 秒內）→ 換邊且繞更久（2 → 4 → 6 秒），長牆也繞得出去
+          detourStreak = t - detourUntil < 10000 ? Math.min(3, detourStreak + 1) : 1;
+          detourCw = !detourCw;
+          detourDirs = want.map((d) => TURN[detourCw ? 'cw' : 'ccw'][d]);
+          detourUntil = t + DETOUR_MS * detourStreak;
+          log?.info('enter: 卡住，往側邊繞', detourDirs);
+          want = detourDirs;
+        }
+      }
       if (activity === 'dodge' && !dodging) state.dodges++;
       dodging = activity === 'dodge';
       if (activity === 'target' && state.activity !== 'target') log?.info('target: 前往指示器目標');

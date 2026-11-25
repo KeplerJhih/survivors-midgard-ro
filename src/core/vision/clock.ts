@@ -28,6 +28,8 @@ export interface FreezeDetector {
   update(glyph: Uint8Array | null, now: number): boolean;
   /** 最近看到時鐘在走（判斷「在對局中」） */
   readonly ticking: boolean;
+  /** 最後一次確認時鐘走動的時間 */
+  readonly changedAt: number;
 }
 
 /** 字形連續 freezeMs 不變 → 停住。必須先看過它走動（開局就停住不判定）；偶爾讀不到（方框被遮）沿用上次狀態 */
@@ -44,6 +46,9 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
   return {
     get ticking() {
       return ticked && nowT - changedAt < 10000;
+    },
+    get changedAt() {
+      return changedAt;
     },
     update(glyph, now) {
       nowT = now;

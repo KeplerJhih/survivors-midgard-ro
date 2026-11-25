@@ -404,3 +404,78 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
     expect(requests).toBe(1);
   });
 });
+
+describe('走向傳送門撞牆', () => {
+  it('時間停住、走向入口光時畫面靜止 → 轉 90° 繞路；入口開著時不按 Enter', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const sent: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    let moving = true;
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => null,
+        pointer: { tap: async () => {} },
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        approachSwirl: () => ['up'],
+        stillFrame: () => ({ width: 4, height: 4, data: new Uint8ClampedArray(64).fill(moving ? (Math.floor(t / 1000) % 2 ? 0 : 200) : 50) }),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(5000);
+    frozenClock = true;
+    run(6000); // 入口開著、一路往上走
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['up']);
+    moving = false; // 撞牆
+    run(4000);
+    expect(bot.state.dirs).not.toEqual(['up']);
+    expect(['left', 'right']).toContain(bot.state.dirs[0]);
+    run(8000);
+    expect(sent).not.toContain('Enter');
+  });
+});
+
+describe('MVP 入口在畫面外', () => {
+  it('時間停住、畫面上沒有入口光 → 追邊緣的大圓盤指示器（傳送門）', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        approachSwirl: () => null,
+        findIndicators: () => [{ kind: 'target', x: 0, y: 0.35, icon: [200, 200, 200], size: 0.06 }],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(5000);
+    frozenClock = true;
+    run(6000);
+    expect(bot.state.frozen).toBe(true);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['down']);
+  });
+});

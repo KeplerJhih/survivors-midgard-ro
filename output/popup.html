@@ -3,23 +3,36 @@
   <head>
     <meta charset="utf-8">
     <title>Midgard Survivors Helper</title>
-    <style>body{color:#1d2433;width:280px;margin:0;padding:12px;font:13px/1.5 system-ui,sans-serif}h1{margin:0 0 8px;font-size:14px}fieldset{border:1px solid #d5dae5;border-radius:6px;margin:0 0 10px;padding:6px 10px}legend{padding:0 4px;font-weight:600}label{align-items:center;gap:6px;margin:4px 0;display:flex}.hint{color:#6b7487;margin:2px 0 4px 22px;font-size:11px}.warn{color:#b3541e}select,input[type=number]{width:96px;margin-left:auto}#reload{width:100%;font:inherit;cursor:pointer;margin:4px 0 6px;padding:6px}#status{color:#2f7a3e;min-height:1.5em;font-size:11px}</style>
-    <script type="module" crossorigin src="/chunks/popup-D1q-3PZd.js"></script>
+    <style>body{color:#1d2433;width:280px;margin:0;padding:12px;font:13px/1.5 system-ui,sans-serif}h1{margin:0 0 8px;font-size:14px}fieldset{border:1px solid #d5dae5;border-radius:6px;margin:0 0 10px;padding:6px 10px}legend{padding:0 4px;font-weight:600}label{align-items:center;gap:6px;margin:4px 0;display:flex}.hint{color:#6b7487;margin:2px 0 4px 22px;font-size:11px}.warn{color:#b3541e}select,input[type=number]{width:96px;margin-left:auto}#reload{width:100%;font:inherit;cursor:pointer;margin:4px 0 6px;padding:6px}#status{color:#2f7a3e;min-height:1.5em;font-size:11px}.tabs{border-bottom:1px solid #d5dae5;gap:4px;margin:0 0 8px;display:flex}.tabs button{font:inherit;color:#6b7487;cursor:pointer;background:0 0;border:0;border-bottom:2px solid #0000;flex:1;padding:5px 0}.tabs button.on{color:#1d2433;border-bottom-color:#4d7cf0;font-weight:600}.page{display:none}.page.on{display:block}.page>.note{color:#6b7487;margin:0 0 6px;font-size:11px}</style>
+    <script type="module" crossorigin src="/chunks/popup-bx4pknvG.js"></script>
   </head>
   <body>
     <h1>Midgard Survivors Helper</h1>
 
+    <nav class="tabs">
+      <button type="button" data-tab="page">頁面</button>
+      <button type="button" data-tab="bot">掛機</button>
+      <button type="button" data-tab="game">遊戲設定</button>
+    </nav>
+
+    <section class="page" data-page="page">
+    <div class="note">改完需重新整理遊戲頁</div>
     <fieldset>
-      <legend>頁面（改完需重新整理遊戲頁）</legend>
+      <legend>頁面</legend>
       <label><input type="checkbox" data-key="mobile"> 模擬 iPhone</label>
       <label><input type="checkbox" data-key="touchBridge"> 滑鼠拖曳轉觸控</label>
       <div class="hint">模擬手機時，用滑鼠操作虛擬搖桿</div>
       <label><input type="checkbox" data-key="background"> 背景持續執行</label>
       <div class="hint">切到其他分頁時遊戲不會停</div>
     </fieldset>
+    <label><input type="checkbox" data-key="debug"> Debug 面板與 log</label>
+    </section>
+
+    <section class="page" data-page="bot">
+    <div class="note">即時生效</div>
 
     <fieldset>
-      <legend>掛機（即時生效）</legend>
+      <legend>掛機</legend>
       <label><input type="checkbox" data-key="bot.enabled"> 啟用掛機</label>
       <label>走位
         <select data-key="bot.mode">
@@ -53,9 +66,13 @@
       </label>
       <div class="hint">例：Acolyte 左 Priest / 右 Monk、Swordsman 左 Knight / 右 Crusader、Mage 左 Wizard / 右 Sage；只有一條路的職業不受影響</div>
     </fieldset>
+    </section>
+
+    <section class="page" data-page="game">
+    <div class="note">遊戲暫停選單裡的勾選，外掛自動同步</div>
 
     <fieldset>
-      <legend>遊戲設定（暫停選單，自動同步）</legend>
+      <legend>遊戲設定</legend>
       <label>隨機選擇
         <select data-key="game.autoPick"><option value="on">開</option><option value="off">關</option><option value="keep">不動</option></select>
       </label>
@@ -68,8 +85,8 @@
       </label>
       <div class="hint">寶箱獎勵累積、不跳窗打斷走位</div>
     </fieldset>
+    </section>
 
-    <label><input type="checkbox" data-key="debug"> Debug 面板與 log</label>
     <button id="reload" type="button">🔄 重新載入外掛（不刷新遊戲）</button>
     <div class="hint" style="margin-left:0">npm run build 後按這裡套用新版掛機邏輯；「頁面」區塊的設定仍需重新整理遊戲頁</div>
     <div id="status"></div>

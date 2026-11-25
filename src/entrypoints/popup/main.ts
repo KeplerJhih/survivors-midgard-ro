@@ -42,6 +42,34 @@ async function main() {
   }
 }
 
+// 分頁：記住上次開的分頁（預設「掛機」）
+function setupTabs() {
+  const KEY = 'msbot.popupTab';
+  const show = (name: string) => {
+    for (const b of document.querySelectorAll<HTMLElement>('[data-tab]')) b.classList.toggle('on', b.dataset.tab === name);
+    for (const p of document.querySelectorAll<HTMLElement>('[data-page]')) p.classList.toggle('on', p.dataset.page === name);
+  };
+  let first = 'bot';
+  try {
+    first = localStorage.getItem(KEY) ?? first;
+  } catch {
+    /* 無法存取 localStorage：用預設 */
+  }
+  if (!document.querySelector(`[data-page="${first}"]`)) first = 'bot';
+  show(first);
+  for (const b of document.querySelectorAll<HTMLElement>('[data-tab]')) {
+    b.addEventListener('click', () => {
+      show(b.dataset.tab!);
+      try {
+        localStorage.setItem(KEY, b.dataset.tab!);
+      } catch {
+        /* 忽略 */
+      }
+    });
+  }
+}
+setupTabs();
+
 document.getElementById('reload')!.addEventListener('click', () => {
   // 外掛重新載入時 popup 會被關閉，不等回應
   browser.runtime.sendMessage({ type: RELOAD_MESSAGE }).catch(() => {});
