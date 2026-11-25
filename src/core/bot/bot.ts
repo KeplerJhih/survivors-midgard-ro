@@ -91,6 +91,9 @@ const STILL_MS = 4000;
 const STILL_CLOCK_GAP = 4000;
 /** 時鐘在這段時間內還有走動＝遊戲進行中（沒有視窗暫停） */
 const GAME_RUNNING_MS = 2000;
+/** 勝利後看不到出口：沿最後方向走多久、原地等到多久才交回一般走位 */
+const EXIT_COAST_MS = 3000;
+const EXIT_WAIT_MS = 12000;
 /** 走向傳送門時畫面靜止多久＝撞牆 → 往側邊繞 DETOUR_MS */
 const STUCK_MS = 1500;
 const DETOUR_MS = 2000;
@@ -290,6 +293,23 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
   };
 
+  /**
+   * 勝利後找出口：出口光時有時無時，不要切回一般走位在巢穴裡亂走（實機：亂走時踩進旁邊的金色 Valhalla 因果傳送門）。
+   * 看不到出口：先沿最後方向走 3 秒，之後原地等；12 秒都沒再看到才交回一般走位（避免永遠卡住）
+   */
+  let lastExit: { dirs: Dir[]; at: number } | null = null;
+  const exitApproach = (t: number): Dir[] | null => {
+    const d = sense.pointer.get(t) ?? sense.exit.get(t);
+    if (d) {
+      lastExit = { dirs: d, at: t };
+      return d;
+    }
+    if (!lastExit) lastExit = { dirs: [], at: t };
+    if (t - lastExit.at < EXIT_COAST_MS) return lastExit.dirs;
+    if (t - lastExit.at < EXIT_WAIT_MS) return [];
+    return null;
+  };
+
   /** 入口在畫面外又沒有指示器（暗色地圖指示圓盤與地形連成一片）→ 依小地圖走回入口剛開時的位置，入口就會回到畫面上 */
   const backToPortalHome = (): Dir[] | null => {
     if (!portalHome || !mmLast) return null;
@@ -453,6 +473,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (frozen) {
           mvpFight = true;
           portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
+          lastExit = null;
         }
       }
       // 時間還停著＝還在巢穴裡（非無盡模式勝利後時鐘不會走）→ 繼續找出口，不因時限放棄
@@ -480,7 +501,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           // 實機：原本時間停住就不看指示器，傳送門在畫面外只能靠走位碰運氣
           // 傳送門指示器優先（只在傳送門於畫面外時出現，最可靠）；在畫面內才靠光：出口找淡藍、入口找高亮光
           approach: exitSeek
-            ? (sense.pointer.get(t) ?? sense.exit.get(t))
+            ? exitApproach(t)
             : frozen && !vitals.boss
               ? (sense.pointer.get(t) ?? sense.approach.get(t) ?? backToPortalHome())
               : null,

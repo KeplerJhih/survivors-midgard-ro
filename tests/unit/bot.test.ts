@@ -758,7 +758,7 @@ describe('巢穴勝利後點掉對話框', () => {
     run(5000);
     expect(bot.state.frozen).toBe(true);
     expect(bot.state.dirs).not.toEqual(['right']);
-    expect(bot.state.activity).not.toBe('enter');
+    expect(bot.state.dirs).toEqual([]); // 看不到出口：原地等，不去追其他亮光
   });
 });
 
@@ -831,5 +831,49 @@ describe('巢穴內（時間停住）', () => {
     fill = 4;
     run(2000);
     expect(bot.state.activity).toBe('retreat');
+  });
+});
+
+describe('勝利後出口光時有時無', () => {
+  it('看不到出口時不切回一般走位亂走：先沿原方向、再原地等', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    let exitSeen = true;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => (exitSeen ? ['left', 'down'] : null),
+        approachSwirl: () => ['right'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(4000);
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(2000);
+    expect(bot.state.dirs).toEqual(['left', 'down']);
+    exitSeen = false;
+    run(1500);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['left', 'down']); // 沿原方向
+    run(4000);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual([]); // 原地等，不亂走
   });
 });
