@@ -241,4 +241,43 @@ describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () 
     run(25000); // 超過時限 → 回到一般走位
     expect(bot.state.activity).not.toBe('enter');
   });
+
+  it('勝利後找出口期間低血量 → 撤退優先', () => {
+    let t = 0;
+    let bar = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let fill = 20;
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        readHp: () => ({ fill, low: false }),
+        approachExit: () => ['right'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(5000);
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(2000);
+    expect(bot.state.activity).toBe('enter');
+    frozenClock = false; // 回到地圖、時鐘恢復（仍在 30 秒出口時限內）
+    fill = 3; // 15%
+    run(2000);
+    expect(bot.state.activity).toBe('retreat');
+  });
 });

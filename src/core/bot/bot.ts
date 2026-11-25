@@ -227,6 +227,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       if (act && pointer) {
         state.screenTaps++;
+        // 點過勝利選擇 / 結算 / 初始技能＝已離開巢穴，不再找出口（寶箱等 modal 不算：勝利後巢穴內也會跳）
+        if (act.kind === 'dialog' || act.kind === 'result' || act.kind === 'start-skill') mvpFight = false;
         state.lastScreen = act.kind;
         log?.info('screen: 點擊', act);
         void pointer.tap(act.x, act.y);
@@ -261,7 +263,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         lastBossAt = t;
         if (frozen) mvpFight = true;
       } else if (t - lastBossAt > EXIT_WINDOW) mvpFight = false;
-      const exitSeek = mvpFight && !vitals.boss;
+      // 低血量時撤退優先（實機：勝利選擇後回到地圖仍在找出口，HP 9% 照樣亂走）
+      const exitSeek = mvpFight && !vitals.boss && !vitals.lowHp;
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
       const bossSeek = sense.bossSeek.get(t);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
