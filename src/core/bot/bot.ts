@@ -90,6 +90,9 @@ const STILL_CLOCK_GAP = 4000;
 /** 走向傳送門時畫面靜止多久＝撞牆 → 往側邊繞 DETOUR_MS */
 const STUCK_MS = 1500;
 const DETOUR_MS = 2000;
+/** 小地圖上移動超過這麼多像素才算有在走；按著方向鍵 MINIMAP_STUCK_MS 都沒超過＝撞牆 */
+const MINIMAP_MOVE_PX = 2;
+const MINIMAP_STUCK_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
 /** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
@@ -136,6 +139,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let detourDirs: Dir[] = [];
   let detourCw = false;
   let detourStreak = 0;
+  /** 小地圖上的玩家位置：按著方向鍵卻久沒移動＝撞牆（畫面上怪物在動，靠畫面靜止判斷不出來） */
+  let mmPos: { x: number; y: number } | null = null;
+  let mmMovedAt = -Infinity;
+  let mmSeenAt = -Infinity;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -217,6 +224,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         const m = deps.readMinimap?.() ?? null;
         if (!m) return null;
         navigator.observe(m.player, state.dirs, now());
+        mmSeenAt = now();
+        if (!mmPos || Math.hypot(m.player.x - mmPos.x, m.player.y - mmPos.y) > MINIMAP_MOVE_PX) {
+          mmPos = m.player;
+          mmMovedAt = now();
+        }
         return bossStalled && m.boss ? navigator.steer(m.player, m.boss) : null;
       },
       null as Dir[] | null,
@@ -368,11 +380,16 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         },
         { patrol: moves.patrol(elapsed), retreat: moves.retreat(elapsed), kite: moves.kite(elapsed) },
       );
-      // 走向傳送門 / 出口時撞牆（實機：下水道地圖直線走過去被牆擋住、畫面不動）→ 轉 90° 繞一段再回來，左右輪流
+      // 走向傳送門 / 出口 / 指示器目標時撞牆（實機：下水道地圖直線走過去被牆擋住）→ 轉 90° 繞一段再回來，左右輪流。
+      // 撞牆判斷：畫面靜止（入口開著、怪物被清空時）或小地圖位置按著方向鍵卻沒動（實機：追目標卡牆，周圍怪物在動）
       let want = decided;
-      if (activity === 'enter') {
+      if (!state.dirs.length || state.activity !== activity) mmMovedAt = Math.max(mmMovedAt, t);
+      if (activity === 'enter' || activity === 'target' || activity === 'portal') {
+        const stuck =
+          (stillSince !== null && t - stillSince >= STUCK_MS) || (t - mmSeenAt < 1000 && t - mmMovedAt >= MINIMAP_STUCK_MS);
         if (t < detourUntil) want = detourDirs;
-        else if (stillSince !== null && t - stillSince >= STUCK_MS && want.length) {
+        else if (stuck && want.length) {
+          mmMovedAt = t;
           // 連續卡住（上次繞完 10 秒內）→ 換邊且繞更久（2 → 4 → 6 秒），長牆也繞得出去
           detourStreak = t - detourUntil < 10000 ? Math.min(3, detourStreak + 1) : 1;
           detourCw = !detourCw;

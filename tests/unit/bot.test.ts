@@ -479,3 +479,34 @@ describe('MVP 入口在畫面外', () => {
     expect(bot.state.dirs).toEqual(['down']);
   });
 });
+
+describe('追目標撞牆', () => {
+  it('按著方向鍵、小地圖位置 2 秒沒動 → 轉 90° 繞路；有在動就照直走', () => {
+    let t = 0;
+    let p = { x: 50, y: 50 };
+    let wall = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        readMinimap: () => ({ player: { ...p }, boss: null }),
+        findIndicators: () => [{ kind: 'target', x: 0, y: 0.35, icon: [255, 218, 112], size: 0.05 }],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) {
+        t += 250;
+        bot.tick();
+        if (!wall && bot.state.dirs.includes('down')) p = { x: p.x, y: p.y + 1 };
+      }
+    };
+    run(4000);
+    expect(bot.state.activity).toBe('target');
+    expect(bot.state.dirs).toEqual(['down']);
+    wall = true;
+    run(3000);
+    expect(['left', 'right']).toContain(bot.state.dirs[0]);
+  });
+});
