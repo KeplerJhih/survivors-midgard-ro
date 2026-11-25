@@ -69,6 +69,11 @@ export function findMinimapSquare(f: Frame): Square | null {
       (b) => Math.abs(b.y - (a.y + a.len)) <= a.len * 0.08 && b.x0 >= a.x0 - 3 && b.x0 + b.len <= a.x0 + a.len + 3,
     );
     if (bottom) return { x0: a.x0, y0: a.y, x1: a.x0 + a.len, y1: a.y + a.len };
+    // 反過來：上邊被壓斷（角色在地圖上緣），以底邊往上推
+    const top = firsts.find(
+      (b) => Math.abs(b.y - (a.y - a.len)) <= a.len * 0.08 && b.x0 >= a.x0 - 3 && b.x0 + b.len <= a.x0 + a.len + 3,
+    );
+    if (top) return { x0: a.x0, y0: a.y - a.len, x1: a.x0 + a.len, y1: a.y };
   }
   return null;
 }

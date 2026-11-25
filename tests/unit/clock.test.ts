@@ -87,6 +87,12 @@ describe('findMinimapSquare + clockGlyph', () => {
     for (let x = 20; x < 180; x++) f.data.set([148, 168, 219, 255], (12 * W + x) * 4);
     expect(findMinimapSquare(f)).toEqual({ x0: 40, y0: 20, x1: 140, y1: 120 });
   });
+
+  it('上邊被圖示壓斷時，用底邊 − 邊長推出方框', () => {
+    const f = make(10);
+    for (let y = 14; y < 28; y++) for (let x = 80; x < 100; x++) f.data.set([255, 38, 25, 255], (y * W + x) * 4);
+    expect(findMinimapSquare(f)).toEqual({ x0: 40, y0: 20, x1: 140, y1: 120 });
+  });
 });
 
 describe('decide（時間停住＝MVP 入口開著）', () => {
