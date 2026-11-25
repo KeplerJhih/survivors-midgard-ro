@@ -157,7 +157,7 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   if (grid) return tap('start-skill', grid);
   // 小卡格（被催眠「等級要轉給誰？」：一個大面板裡 ≥5 張等寬小卡、沒有按鈕）→ 點左上第一張
   const tile = tileGrid(regions);
-  if (tile) return tap('start-skill', tile);
+  if (tile) return tap('modal', tile);
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
   const frag = bottomFragment(regions);
   if (frag) return tap('modal', frag);
