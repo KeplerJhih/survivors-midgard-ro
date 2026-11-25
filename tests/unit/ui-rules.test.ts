@@ -406,6 +406,16 @@ describe('結算頁帶回 Kafra 倉庫物品格', () => {
     expect(t[1]!.x).toBeCloseTo(0.5455, 3);
   });
 
+  it('只有 1 件可帶：上方「本局卡片」列的卡片圖示不算，取分頁鈕正下方的物品格', () => {
+    // 實機 1920×873（640 取樣）：卡片圖示 (0.447,0.608) 與物品格 (0.484,0.787) 各 1 格同票 → 原本點到卡片
+    const card = { kind: 'other' as const, x0: 0.447, y0: 0.608, x1: 0.467, y1: 0.653, fill: 0.6, luma: 246 };
+    const item = { kind: 'other' as const, x0: 0.484, y0: 0.787, x1: 0.515, y1: 0.859, fill: 0.6, luma: 252 };
+    const tabs = [0.43, 0.48, 0.53].map((x) => ({ kind: 'button' as const, x0: x, y0: 0.72, x1: x + 0.045, y1: 0.76, fill: 0.6, luma: 240 }));
+    const k = keepTiles([card, item, ...tabs], 1920 / 873);
+    expect(k).toHaveLength(1);
+    expect(k[0]!.y).toBeCloseTo(0.823, 2);
+  });
+
   it('上半部的技能圖示列不算', () => {
     const icons = [0.3, 0.34, 0.38, 0.42, 0.46].map((x) => ({ kind: 'other' as const, x0: x, y0: 0.3, x1: x + 0.03, y1: 0.36, fill: 0.6, luma: 200 }));
     expect(keepTiles(icons, 1568 / 713)).toEqual([]);

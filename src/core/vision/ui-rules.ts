@@ -113,7 +113,18 @@ export function keepTiles(regions: Region[], aspect: number): { x: number; y: nu
     else groups.push([r]);
   }
   // 只在已認出結算頁時才呼叫 → 1 格也算（實機：只有 3 件可帶，原本要求 ≥ 4 格 → 一件都沒帶）
-  const row = groups.sort((a, b) => b.length - a.length)[0];
+  // 物品格正上方有一排分頁鈕（傳說 / 紫色 / 其餘）；上方「本局卡片」列的卡片圖示也是近正方形
+  // （實機：只有 1 件可帶時，卡片圖示和物品格各 1 格同票 → 點到卡片、物品沒帶走）
+  // → 先看上方有沒有分頁鈕，再比格數，同分取較下面那排
+  const buttons = regions.filter((r) => r.kind === 'button');
+  const hasTabs = (g: Region[]) => {
+    const y = cy(g[0]!);
+    const above = buttons.filter((b) => cy(b) < y - 0.03 && cy(b) > y - 0.2);
+    return above.some((b) => above.filter((o) => Math.abs(cy(o) - cy(b)) <= 0.02).length >= 2);
+  };
+  const row = groups.sort(
+    (a, b) => Number(hasTabs(b)) - Number(hasTabs(a)) || b.length - a.length || b[0]!.y1 - a[0]!.y1,
+  )[0];
   if (!row) return [];
   const ws = row.map(rw).sort((a, b) => a - b);
   const medW = ws[ws.length >> 1]!;
