@@ -71,6 +71,8 @@ export interface BotDeps {
 }
 
 /** 各感知的取樣間隔 */
+/** MVP 勝利後找出口的時限 */
+const EXIT_WINDOW = 30000;
 const INTERVAL = { minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
 /** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
 const RETREAT_FACTOR = 2.5;
@@ -96,8 +98,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let lowHp = false;
   let boss = false;
   let screenStreak = 0;
-  let mvpDone = false;
-  let calmSince: number | null = null;
+  let mvpFight = false;
+  let lastBossAt = -Infinity;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -245,14 +247,14 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const portal = sense.portal.get(t);
       const frozen = sense.frozen.get(t);
       state.frozen = frozen;
-      // 時間停住期間打過首領＝在 MVP 巢穴裡（入口開著時一般怪物會被清掉，不會有首領）→ 勝利後找淡藍出口；
-      // 時間恢復且沒首領超過 10 秒才清除（停住判定偶爾閃動）
-      if (frozen && vitals.boss) mvpDone = true;
-      if (!frozen && !vitals.boss) {
-        if (calmSince === null) calmSince = t;
-        else if (t - calmSince > 10000) mvpDone = false;
-      } else calmSince = null;
-      const busy = portal || vitals.lowHp || vitals.boss || frozen;
+      // 時間停住期間打過首領＝在 MVP 巢穴裡（入口開著時一般怪物會被清掉，不會有首領）→ 勝利後找淡藍出口。
+      // 實機：無盡模式勝利後巢穴內時鐘恢復走動 → 不能靠「停住」判斷，改成首領消失後 30 秒內都找出口
+      if (vitals.boss) {
+        lastBossAt = t;
+        if (frozen) mvpFight = true;
+      } else if (t - lastBossAt > EXIT_WINDOW) mvpFight = false;
+      const exitSeek = mvpFight && !vitals.boss;
+      const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
       const bossSeek = sense.bossSeek.get(t);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
       const target = busy ? null : bossSeek ?? sense.target.get(t);
@@ -263,9 +265,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           portal,
           target,
           object,
-          frozen,
-          approach: frozen && !vitals.boss ? (mvpDone ? sense.exit.get(t) : sense.approach.get(t)) : null,
-          flee: frozen ? null : sense.swirl.get(t),
+          frozen: frozen || exitSeek,
+          approach: exitSeek ? sense.exit.get(t) : frozen && !vitals.boss ? sense.approach.get(t) : null,
+          flee: frozen || exitSeek ? null : sense.swirl.get(t),
           danger: sense.danger.get(t),
           ...vitals,
         },

@@ -222,5 +222,13 @@ describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () 
     expect(bot.state.boss).toBe(false);
     expect(bot.state.activity).toBe('enter');
     expect(bot.state.dirs).toEqual(['right']);
+    // 無盡模式：勝利後巢穴內時鐘恢復走動，仍在 30 秒內找出口
+    frozenClock = false;
+    run(8000);
+    expect(bot.state.frozen).toBe(false);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['right']);
+    run(25000); // 超過時限 → 回到一般走位
+    expect(bot.state.activity).not.toBe('enter');
   });
 });
