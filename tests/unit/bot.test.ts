@@ -130,6 +130,16 @@ describe('bot', () => {
     bot.tick();
     expect(bot.state.activity).toBe('retreat');
     expect(bot.state.hp).toBeCloseTo(0.2);
+
+    // 遲滯：回到 0.6（> 門檻 0.5、< 0.7）仍撤退；0.75 才恢復
+    fill = 12;
+    t += 500;
+    bot.tick();
+    expect(bot.state.activity).toBe('retreat');
+    fill = 15;
+    t += 500;
+    bot.tick();
+    expect(bot.state.activity).toBe('target');
   });
 
   it('首領戰：不追目標、改大圈風箏', () => {

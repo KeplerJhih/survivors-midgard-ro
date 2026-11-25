@@ -43,6 +43,8 @@
       <label>走位週期 (ms) <input type="number" min="1000" step="500" data-key="bot.circlePeriodMs" /></label>
       <div class="hint">單圈時間，越大繞得越大（花瓣掃描半徑約為單圈的 2 倍）</div>
       <label>選卡間隔 (ms) <input type="number" min="500" step="100" data-key="bot.pickIntervalMs" /></label>
+      <label>低血量撤退 (0~1) <input type="number" min="0.1" max="0.9" step="0.05" data-key="bot.lowHpRatio" /></label>
+      <div class="hint">血量低於此比例就不追目標、改大圈撤退，回到 +0.2 才恢復</div>
       <label><input type="checkbox" data-key="bot.portalSeek" /> MVP 後自動走回地圖</label>
       <div class="hint">畫面辨識「返回地圖」傳送門，避開紅色傳送門</div>
       <label><input type="checkbox" data-key="bot.dodge" /> 躲紅色預警框</label>

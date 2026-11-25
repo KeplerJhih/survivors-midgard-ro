@@ -61,7 +61,7 @@ export const DEFAULT_SETTINGS: Settings = {
     seekTargets: true,
     seekObjects: false,
     dodge: true,
-    lowHpRatio: 0.35,
+    lowHpRatio: 0.5,
     bossKite: true,
     autoContinue: true,
   },
