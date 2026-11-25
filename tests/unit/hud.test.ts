@@ -30,6 +30,23 @@ describe('readHp', () => {
 });
 
 describe('createHpTracker', () => {
+  it('血很低時 HP 條消失、讀到下方的條 → 當成見底，不重新學 HP 列', () => {
+    const t = createHpTracker();
+    t.update({ fill: 40, low: false, y: 0.04 });
+    expect(t.update({ fill: 8, low: true, y: 0.04 })!.ratio).toBeCloseTo(0.2);
+    for (let i = 0; i < 10; i++) expect(t.update({ fill: 18, low: false, y: 0.06 })).toEqual({ ratio: 0, low: true });
+    // 補血後 HP 條回來
+    expect(t.update({ fill: 30, low: false, y: 0.04 })!.ratio).toBeCloseTo(0.75);
+  });
+
+  it('HP 條消失超過 20 筆 → 照常重新學（避免記錯列時永遠撤退）', () => {
+    const t = createHpTracker();
+    t.update({ fill: 40, low: false, y: 0.04 });
+    t.update({ fill: 8, low: true, y: 0.04 });
+    for (let i = 0; i < 19; i++) expect(t.update({ fill: 18, low: false, y: 0.06 })!.ratio).toBe(0);
+    expect(t.update({ fill: 18, low: false, y: 0.06 })!.ratio).toBe(1);
+  });
+
   it('以看過的最長長度當滿血換算比例', () => {
     const t = createHpTracker();
     expect(t.update({ fill: 20, low: false })!.ratio).toBe(1);

@@ -60,6 +60,7 @@ export function createHpTracker(): HpTracker {
   let full = 0;
   let hpY = Infinity;
   let misses = 0;
+  let last = 1;
   return {
     update(r) {
       if (!r) return null;
@@ -67,6 +68,9 @@ export function createHpTracker(): HpTracker {
       // （實機：滿血卻讀成 0.2 = 經驗 23%，誤觸低血量撤退）→ 當讀不到
       if (r.y !== undefined) {
         if (r.y > hpY + 0.012) {
+          // 剛才血已經很低 → HP 條短到切不出來（實機：HP 6/1281 時讀到下方 SP 條 0.45、不撤退而陣亡）
+          // → 當成見底，也不重新學 HP 列；約 10 秒（20 筆）都沒回來才照常重新學（避免記錯列時永遠撤退）
+          if (last < 0.35 && ++misses < 20) return { ratio: 0, low: true };
           // 連續多次都在下面＝記住的 HP 列是錯的（被上方其他藍色撐高）→ 重新學
           if (++misses < 6) return null;
           hpY = Infinity;
@@ -78,7 +82,8 @@ export function createHpTracker(): HpTracker {
         hpY = Math.min(hpY, r.y);
       }
       full = Math.max(full, r.fill);
-      return { ratio: full ? r.fill / full : 1, low: r.low };
+      last = full ? r.fill / full : 1;
+      return { ratio: last, low: r.low };
     },
   };
 }
