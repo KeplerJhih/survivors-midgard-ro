@@ -17,6 +17,8 @@ export interface HpReading {
   fill: number;
   /** HP 條變紅（< 25%） */
   low: boolean;
+  /** 所在列（0~1）；供 tracker 排除下方其他條（SP、經驗） */
+  y?: number;
 }
 
 export function readHp(f: Frame): HpReading | null {
@@ -43,7 +45,7 @@ export function readHp(f: Frame): HpReading | null {
       }
     }
     if (!best || best.end - best.start + 1 < Math.max(2, 0.008 * W)) continue;
-    return { fill: best.end - best.start + 1, low: best.red };
+    return { fill: best.end - best.start + 1, low: best.red, y: y / H };
   }
   return null;
 }
@@ -56,9 +58,16 @@ export interface HpTracker {
 /** 以看過的最長填滿長度當滿血長度（開局通常滿血）；視窗大小改變導致更長時自動更新 */
 export function createHpTracker(): HpTracker {
   let full = 0;
+  let hpY = Infinity;
   return {
     update(r) {
       if (!r) return null;
+      // HP 是最上面那條；讀到比看過的 HP 列更下面的條 = HP 條這一刻沒抓到、抓到經驗條
+      // （實機：滿血卻讀成 0.2 = 經驗 23%，誤觸低血量撤退）→ 當讀不到
+      if (r.y !== undefined) {
+        if (r.y > hpY + 0.012) return null;
+        hpY = Math.min(hpY, r.y);
+      }
       full = Math.max(full, r.fill);
       return { ratio: full ? r.fill / full : 1, low: r.low };
     },

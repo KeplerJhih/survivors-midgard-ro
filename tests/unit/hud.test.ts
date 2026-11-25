@@ -20,8 +20,8 @@ function frame(hpFill: number, hpRgb = [84, 140, 242], spFill = 20): Frame {
 
 describe('readHp', () => {
   it('讀最上面那條（HP）的填滿長度', () => {
-    expect(readHp(frame(20, undefined, 5))).toEqual({ fill: 20, low: false });
-    expect(readHp(frame(8, undefined, 20))).toEqual({ fill: 8, low: false });
+    expect(readHp(frame(20, undefined, 5))).toMatchObject({ fill: 20, low: false });
+    expect(readHp(frame(8, undefined, 20))).toMatchObject({ fill: 8, low: false });
   });
 
   it('HP 條變紅（< 25%）→ low', () => {
@@ -35,6 +35,13 @@ describe('createHpTracker', () => {
     expect(t.update({ fill: 20, low: false })!.ratio).toBe(1);
     expect(t.update({ fill: 7, low: false })!.ratio).toBeCloseTo(0.35);
     expect(t.update({ fill: 4, low: true })).toEqual({ ratio: 0.2, low: true });
+  });
+
+  it('HP 條這一刻沒抓到、讀到下面的經驗條 → 當讀不到，不當成低血量', () => {
+    const t = createHpTracker();
+    expect(t.update({ fill: 20, low: false, y: 0.04 })!.ratio).toBe(1);
+    expect(t.update({ fill: 5, low: false, y: 0.09 })).toBeNull();
+    expect(t.update({ fill: 19, low: false, y: 0.041 })!.ratio).toBeCloseTo(0.95);
   });
 });
 
