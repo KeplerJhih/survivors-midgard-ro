@@ -561,8 +561,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 撞牆判斷：畫面靜止（入口開著、怪物被清空時）或小地圖位置按著方向鍵卻沒動（實機：追目標卡牆，周圍怪物在動）
       let want = decided;
       if (!state.dirs.length || state.activity !== activity) mmMovedAt = Math.max(mmMovedAt, t);
-      // 找出口時不繞路：巢穴是開闊場地，轉 90° 反而可能擦過旁邊的因果路線傳送門
-      if ((activity === 'enter' && !exitSeek) || activity === 'target' || activity === 'portal') {
+      // 一般走位 / 撤退 / 風箏也會撞牆（實機：走位圖形照時間按鍵，撞牆就一直推著牆）→ 一律繞路。
+      // 例外：閃避與逃離催眠師（方向不能被改）、找出口（巢穴開闊，轉 90° 反而可能擦過因果路線傳送門）
+      if (activity !== 'dodge' && activity !== 'flee' && !(activity === 'enter' && exitSeek)) {
         const stuck =
           (stillSince !== null && t - stillSince >= STUCK_MS) || (t - mmSeenAt < 1000 && t - mmMovedAt >= MINIMAP_STUCK_MS);
         if (t < detourUntil) want = detourDirs;

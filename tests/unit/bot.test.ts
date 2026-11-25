@@ -988,3 +988,27 @@ describe('破關帶回：最高分頁不足 3 件', () => {
     expect(taps.slice(0, 5)).toEqual(['0.2', '0.5', '0.3', '0.34', '0.47']);
   });
 });
+
+describe('一般走位撞牆', () => {
+  it('按著方向鍵小地圖位置 2 秒沒動 → 轉 90° 繞路', () => {
+    let t = 0;
+    let p = { x: 50, y: 50 };
+    let wall = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle', circlePeriodMs: 600000 },
+      { keyboard, now: () => t, readMinimap: () => ({ player: { ...p }, boss: null, altars: [] }) },
+    );
+    const seen: string[] = [];
+    for (; t < 12000; t += 100) {
+      if (t === 3000) wall = true;
+      bot.tick();
+      const held = bot.state.dirs;
+      if (!wall) p = { x: p.x + (held.includes('right') ? 0.3 : 0), y: p.y - (held.includes('up') ? 0.3 : 0) };
+      if (t > 6000) seen.push(held.join('+'));
+    }
+    expect(bot.state.activity).toBe('patrol');
+    // 週期 600 秒的大圈在這段時間都往正右；撞牆後應出現轉 90° 的方向
+    expect(seen.some((d) => d.includes('up') || d.includes('down'))).toBe(true);
+  });
+});
