@@ -488,7 +488,8 @@ function dimmedDialog(f: Frame, regions: Region[]): Region | null {
  * 只有一條路的職業（卡片置中）不處理，交給 Enter 備援（只有一個選項）。
  */
 function jobChange(regions: Region[], path: 0 | 1): { x: number; y: number } | null {
-  const boxes = regions.filter((r) => rw(r) * rh(r) >= 0.25 && rh(r) >= 0.6 && Math.abs(cx(r) - 0.5) < 0.06);
+  // 面板高度隨視窗比例變（實機 1080×854：0.2~0.8 × 0.20~0.80，高 0.594）→ 門檻放寬到 0.45
+  const boxes = regions.filter((r) => rw(r) * rh(r) >= 0.2 && rh(r) >= 0.45 && Math.abs(cx(r) - 0.5) < 0.06);
   for (const p of boxes) {
     const cards = regions
       .filter(

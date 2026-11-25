@@ -56,6 +56,18 @@ describe('decideByLayout（結構判斷）', () => {
       expect(a.kind).toBe('job');
       expect(a.x).toBeCloseTo(0.63, 1);
     });
+    it('實機 1080×854：面板高只有 0.594、右卡被歸為 panel → 仍認得出、右邊點鏡像位置', () => {
+      const f = { width: 640, height: 506, data: new Uint8ClampedArray(640 * 506 * 4) };
+      const regions = [
+        { kind: 'other' as const, x0: 0.2, y0: 0.202, x1: 0.8, y1: 0.796, fill: 0.32, luma: 230 },
+        { kind: 'card' as const, x0: 0.212, y0: 0.292, x1: 0.492, y1: 0.753, fill: 0.77, luma: 240 },
+        { kind: 'panel' as const, x0: 0.511, y0: 0.48, x1: 0.784, y1: 0.745, fill: 0.74, luma: 240 },
+      ];
+      const a = decideByLayout(f, regions, undefined, { jobPath: 'second' })!;
+      expect(a.kind).toBe('job');
+      expect(a.x).toBeCloseTo(0.648, 2);
+      expect(decideByLayout(f, regions)!.x).toBeCloseTo(0.352, 2);
+    });
     it('兩張都切得出來 → 依設定點對應的那張', () => {
       const g = draw(GRASS, [
         { x0: 0.24, y0: 0.08, x1: 0.76, y1: 0.92, fill: PANEL },
