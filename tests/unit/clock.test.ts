@@ -32,6 +32,17 @@ describe('createFreezeDetector', () => {
     expect(d.update(glyph(50), t + 1000)).toBe(true);
   });
 
+  it('字形長度變了（方框寬度差幾 px）不重新計時，停住判定不閃動', () => {
+    const d = createFreezeDetector(3000);
+    let t = 0;
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(s), t);
+    for (let i = 0; i < 4; i++, t += 1000) d.update(glyph(3), t);
+    expect(d.update(glyph(3), t)).toBe(true);
+    const shorter = glyph(3).slice(0, 290);
+    expect(d.update(shorter, t + 500)).toBe(true);
+    expect(d.update(glyph(3), t + 1000)).toBe(true);
+  });
+
   it('載入畫面（沒有字）不重置：之後時鐘一直停在同一個數字 → 判定停住', () => {
     const d = createFreezeDetector(3000);
     let t = 0;

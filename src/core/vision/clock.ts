@@ -61,9 +61,11 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
           changedAt = now;
           ticked = true;
         }
-      } else {
-        changedAt = now; // 第一次或版面改變：重新計時
+      } else if (!last) {
+        changedAt = now; // 第一次：開始計時
       }
+      // 長度不同（方框由上下邊找到 / 由單邊推算，寬差幾 px）：只換參考字形，不重新計時
+      // （實機：入口開著時兩種方式交替 → 每次都重置 → 「停住」閃動）
       last = glyph;
       lastOn = on;
       return (state = ticked && now - changedAt >= freezeMs);
