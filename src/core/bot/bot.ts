@@ -484,7 +484,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 撞牆判斷：畫面靜止（入口開著、怪物被清空時）或小地圖位置按著方向鍵卻沒動（實機：追目標卡牆，周圍怪物在動）
       let want = decided;
       if (!state.dirs.length || state.activity !== activity) mmMovedAt = Math.max(mmMovedAt, t);
-      if (activity === 'enter' || activity === 'target' || activity === 'portal') {
+      // 找出口時不繞路：巢穴是開闊場地，轉 90° 反而可能擦過旁邊的因果路線傳送門
+      if ((activity === 'enter' && !exitSeek) || activity === 'target' || activity === 'portal') {
         const stuck =
           (stillSince !== null && t - stillSince >= STUCK_MS) || (t - mmSeenAt < 1000 && t - mmMovedAt >= MINIMAP_STUCK_MS);
         if (t < detourUntil) want = detourDirs;

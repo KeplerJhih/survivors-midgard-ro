@@ -121,8 +121,26 @@ export function fleeSwirl(f: Frame, near = 0.25): Dir[] | null {
  */
 export function approachExit(f: Frame): Dir[] | null {
   const s = findPortalGlow(f, 20, isExitBlue);
-  return s ? dirsFromAngle(Math.atan2(-s.y, s.x)) : null;
+  if (!s) return null;
+  // 因果路線傳送門（金色 Valhalla / 紅色 Niflheim）與出口相距約 5 單位（mvp_raid.gd offer_exits ±2.6 側移），
+  // 一靠近就直接進入、沒有確認框（實機：走向出口途中擦過 → 進了 Valkyrie Reginleif 戰）。
+  // → 出口方向減去「遠離因果傳送門」的推力，越近推得越強
+  let vx = s.x / (Math.hypot(s.x, s.y) || 1);
+  let vy = s.y / (Math.hypot(s.x, s.y) || 1);
+  // 因果傳送門的地面光暈比出口大（ground_glow 2.8 vs 出口 1.3）→ 門檻較高，避免把技能特效當成它
+  const k = findPortalGlow(f, 40, isKarmaGlow);
+  if (k) {
+    const d = Math.hypot(k.x, k.y) || 1e-3;
+    const w = Math.min(2, 0.12 / d);
+    vx -= (k.x / d) * w;
+    vy -= (k.y / d) * w;
+  }
+  return dirsFromAngle(Math.atan2(-vy, vx));
 }
+
+/** 因果路線傳送門的光：金色（Valhalla (1.0,0.92,0.6)）或紅色（Niflheim (0.85,0.12,0.2)），高亮、非藍 */
+const isKarmaGlow = (r: number, g: number, b: number) =>
+  r >= 200 && b < r - 60 && ((g >= 180 && b <= 190) || (g <= 90 && b <= 110));
 
 export function approachSwirl(f: Frame): Dir[] | null {
   const s = findSwirl(f) ?? findPortalGlow(f);

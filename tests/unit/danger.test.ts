@@ -171,3 +171,25 @@ describe('approachExit：出口緊貼角色', () => {
     expect(approachExit({ width: W, height: H, data })).toEqual(['left']);
   });
 });
+
+describe('approachExit：避開因果路線傳送門', () => {
+  const W = 160, H = 73;
+  const frame = (spots: { x: number; y: number; r: number; rgb: [number, number, number] }[]) => {
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i++) data.set([90, 110, 60, 255], i * 4);
+    for (const s of spots)
+      for (let dy = -s.r; dy <= s.r; dy++)
+        for (let dx = -s.r; dx <= s.r; dx++) data.set([...s.rgb, 255], ((Math.round(s.y * H) + dy) * W + Math.round(s.x * W) + dx) * 4);
+    return { width: W, height: H, data };
+  };
+  it('出口在正右方、金色 Valhalla 傳送門在右下很近 → 往右上繞開（沒有它時是正右）', () => {
+    const exit = { x: 0.75, y: 0.47, r: 3, rgb: [160, 215, 250] as [number, number, number] };
+    expect(approachExit(frame([exit]))).toEqual(['right']);
+    const d = approachExit(frame([exit, { x: 0.6, y: 0.56, r: 5, rgb: [255, 235, 153] }]))!;
+    expect(d).toEqual(['right', 'up']);
+  });
+  it('沒有因果傳送門 → 直接朝出口', () => {
+    const f = frame([{ x: 0.7, y: 0.5, r: 3, rgb: [160, 215, 250] }]);
+    expect(approachExit(f)).toEqual(['right']);
+  });
+});
