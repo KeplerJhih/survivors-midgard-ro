@@ -254,6 +254,20 @@ function blobs(f: Frame, match: (r: number, g: number, b: number) => boolean): B
   return out;
 }
 
+/**
+ * 方框邊線常被標記壓斷（實機：祭壇標記與玩家箭頭擠在上緣，上邊碎成短段 → 方框時有時無、祭壇讀不到）。
+ * 視窗大小沒變時小地圖位置固定 → 找不到就沿用上次找到的方框。
+ */
+let lastSquare: { w: number; h: number; sq: Square } | null = null;
+function squareOrLast(f: Frame): Square | null {
+  const sq = findMinimapSquare(f);
+  if (sq) {
+    lastSquare = { w: f.width, h: f.height, sq };
+    return sq;
+  }
+  return lastSquare && lastSquare.w === f.width && lastSquare.h === f.height ? lastSquare.sq : null;
+}
+
 export function readMinimap(f: Frame): MinimapRead | null {
   const area = f.width * f.height;
   const arrow = blobs(f, isArrow)
@@ -265,7 +279,7 @@ export function readMinimap(f: Frame): MinimapRead | null {
     blobs(f, isBossDot)
       .filter((b) => b.n >= area * 0.00001 && Math.hypot(b.x - arrow.x, b.y - arrow.y) > 6)
       .sort((a, b) => b.n - a.n)[0] ?? null;
-  const sq = findMinimapSquare(f);
+  const sq = squareOrLast(f);
   return {
     player: { x: arrow.x, y: arrow.y },
     boss: boss ? { x: boss.x, y: boss.y } : null,
