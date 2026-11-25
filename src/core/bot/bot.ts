@@ -143,6 +143,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let mmPos: { x: number; y: number } | null = null;
   let mmMovedAt = -Infinity;
   let mmSeenAt = -Infinity;
+  /** 小地圖位置真正變化的時間（不因切換動作而重設；判斷「遊戲被暫停」用） */
+  let mmChangedAt = -Infinity;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -228,6 +230,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (!mmPos || Math.hypot(m.player.x - mmPos.x, m.player.y - mmPos.y) > MINIMAP_MOVE_PX) {
           mmPos = m.player;
           mmMovedAt = now();
+          mmChangedAt = now();
         }
         return bossStalled && m.boss ? navigator.steer(m.player, m.boss) : null;
       },
@@ -325,11 +328,22 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const stillSince = sense.still.get(t);
       if (stillSince === null) stillInRun = null;
       else if (stillInRun === null) stillInRun = clock.ticking && t - clock.changedAt < STILL_CLOCK_GAP;
-      if (!seen && !deps.gameSync?.busy && stillInRun && stillSince !== null && t - stillSince >= STILL_MS && t - lastEnter >= ENTER_COOLDOWN) {
+      const stillPause = stillInRun && stillSince !== null && t - stillSince >= STILL_MS;
+      // 另一種暫停訊號：時鐘停住、按著方向鍵小地圖位置也不動，且兩者「一起」停下（差 < STILL_CLOCK_GAP）。
+      // 實機：「任務完成！」視窗在左側、背後 NPC 立繪與特效還在動 → 畫面不算靜止，Enter 備援不觸發，卡住。
+      // MVP 入口開著 / 巢穴內：時鐘早就停了、角色還能走 → 不會一起停，不按
+      const heldStill =
+        clock.changedAt > -Infinity &&
+        t - clock.changedAt >= STILL_MS &&
+        t - mmSeenAt < 1500 &&
+        state.dirs.length > 0 &&
+        t - mmChangedAt >= STILL_MS &&
+        Math.abs(clock.changedAt - mmChangedAt) < STILL_CLOCK_GAP;
+      if (!seen && !deps.gameSync?.busy && (stillPause || heldStill) && t - lastEnter >= ENTER_COOLDOWN) {
         lastEnter = t;
         state.screenTaps++;
         state.lastScreen = 'still-enter';
-        log?.info('screen: 畫面靜止且辨識不到視窗，按 Enter');
+        log?.info('screen: 遊戲像是被辨識不到的視窗暫停，按 Enter', { stillPause, heldStill });
         void keyboard.tap('enter');
       }
 

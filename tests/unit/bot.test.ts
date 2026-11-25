@@ -510,3 +510,58 @@ describe('追目標撞牆', () => {
     expect(['left', 'right']).toContain(bot.state.dirs[0]);
   });
 });
+
+describe('辨識不到的視窗（畫面還在動）', () => {
+  const setup = () => {
+    let t = 0;
+    let digit = 0;
+    let clockRuns = true;
+    let moves = true;
+    let p = { x: 50, y: 50 };
+    const sent: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => null,
+        pointer: { tap: async () => {} },
+        clockGlyph: () => {
+          if (clockRuns) digit++;
+          return glyph();
+        },
+        readMinimap: () => ({ player: { ...p }, boss: null }),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) {
+        t += 250;
+        bot.tick();
+        if (moves) p = { x: p.x + 1, y: p.y };
+      }
+    };
+    return { sent, run, set: (c: boolean, m: boolean) => ((clockRuns = c), (moves = m)) };
+  };
+
+  it('時鐘與角色同時停下（視窗暫停）→ 按 Enter', () => {
+    const { sent, run, set } = setup();
+    run(5000);
+    set(false, false);
+    run(8000);
+    expect(sent).toContain('Enter');
+  });
+
+  it('入口開著：時鐘早就停了、之後才撞牆停下 → 不按 Enter', () => {
+    const { sent, run, set } = setup();
+    run(5000);
+    set(false, true); // 入口開著，角色還在走
+    run(10000);
+    set(false, false); // 撞牆
+    run(8000);
+    expect(sent).not.toContain('Enter');
+  });
+});
