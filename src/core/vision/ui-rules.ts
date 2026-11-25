@@ -118,6 +118,13 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     const p = container(bottom);
     if (p && rw(p) >= 0.8) return tap('result', bottom[bottom.length === 4 ? 1 : 0]!);
   }
+  // 結算頁（全螢幕面板、最下排在畫面底部）：按鈕邊框淡，切出幾顆不一定（實機：有時頭尾兩顆、有時中間兩顆被當成
+  // 一般對話框點了「前往 Prontera」進城鎮）→ 直接沿按鈕底邊掃圓角記號切出每顆按鈕
+  if (bottom && cy(bottom[0]!) >= 0.85 && regions.some((r) => rw(r) >= 0.8 && rh(r) >= 0.85)) {
+    const slots = resultSlots(f, bottom);
+    if (slots.length === 4) return { kind: 'result', x: slots[1]!, y: cy(bottom[0]!) };
+    if (slots.length === 3) return { kind: 'result', x: slots[0]!, y: cy(bottom[0]!) };
+  }
   // 結算（無盡模式「你倒下了」）：4 顆中間兩顆（再玩一次、前往城鎮）邊框淡、切不出來，只剩頭尾兩顆、中間空很大
   // （實機：0.361~0.422 與 0.588~0.639）→ 點空隙前 1/4（再玩一次，實際 0.43~0.49）
   if (bottom && bottom.length === 2 && cy(bottom[0]!) >= 0.85) {
@@ -230,6 +237,38 @@ function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | 
     if (w < 0.02 || w > 0.25 || h < 0.015 || h > 0.1 || n < perimeter * 0.3) continue;
     const c = { x: (mnx + mxx + 1) / 2 / W, y: (mny + mxy + 1) / 2 / H };
     if (!best || c.y > best.y) best = c;
+  }
+  return best;
+}
+
+/**
+ * 結算頁底排按鈕：在已切出的按鈕底邊上方幾列，找暗色圓角記號（亮度 < 200），相距 ≤ 1.5% 的記號歸成一群；
+ * 群 k 與群 k+1 之間就是第 k 顆按鈕（實機：4 顆 → 5 群）。回傳各按鈕中心 x。
+ */
+function resultSlots(f: Frame, row: Region[]): number[] {
+  const { width: W, height: H, data } = f;
+  const y1 = Math.max(...row.map((r) => r.y1));
+  let best: number[] = [];
+  for (let dy = 1; dy <= Math.max(2, Math.round(0.012 * H)); dy++) {
+    const y = Math.round(y1 * H) - dy;
+    if (y < 0) break;
+    const marks: number[] = [];
+    for (let x = Math.round(0.15 * W); x < Math.round(0.85 * W); x++) {
+      const i = (y * W + x) * 4;
+      if (0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]! < 200) marks.push(x);
+    }
+    const groups: number[][] = [];
+    for (const x of marks) {
+      const g = groups[groups.length - 1];
+      if (g && x - g[g.length - 1]! <= 0.015 * W) g.push(x);
+      else groups.push([x]);
+    }
+    if (groups.length < 4 || groups.length > 5) continue;
+    const centers = groups.map((g) => (g[0]! + g[g.length - 1]!) / 2 / W);
+    const slots = centers.slice(1).map((c, k) => (centers[k]! + c) / 2);
+    // 每顆寬 3~15%
+    if (!slots.every((_, k) => centers[k + 1]! - centers[k]! >= 0.03 && centers[k + 1]! - centers[k]! <= 0.15)) continue;
+    if (slots.length > best.length) best = slots;
   }
   return best;
 }
