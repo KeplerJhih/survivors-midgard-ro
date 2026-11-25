@@ -122,9 +122,11 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   }
   // 結算頁（全螢幕面板、最下排在畫面底部）：按鈕邊框淡，切出幾顆不一定（實機：有時頭尾兩顆、有時中間兩顆被當成
   // 一般對話框點了「前往 Prontera」進城鎮）→ 直接沿按鈕底邊掃圓角記號切出每顆按鈕
-  if (regions.some((r) => rw(r) >= 0.8 && rh(r) >= 0.85) && (!bottom || cy(bottom[0]!) >= 0.85)) {
-    // 有切出底排就沿它的底邊掃；一顆都切不出來（實機：點成一般視窗 → 進城鎮）就掃畫面底部 88~99%
-    const hit = bottom
+  if (regions.some((r) => rw(r) >= 0.8 && rh(r) >= 0.85)) {
+    // 有切出底排（在畫面底部）就沿它的底邊掃；否則掃畫面底部 88~99%
+    // （實機：一顆都切不出來 → 點成一般視窗進城鎮；開了「傷害詳情」小視窗時最下排變成上方的統計格）
+    const atBottom = bottom && cy(bottom[0]!) >= 0.85;
+    const hit = atBottom
       ? resultSlots(f, Math.max(...bottom.map((r) => r.y1)), Math.max(2, Math.round(0.012 * f.height)))
       : resultSlots(f, 0.99, Math.round(0.11 * f.height));
     if (hit && hit.slots.length === 4) return { kind: 'result', x: hit.slots[1]!, y: hit.y };
