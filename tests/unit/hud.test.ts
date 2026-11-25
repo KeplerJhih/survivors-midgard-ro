@@ -43,6 +43,13 @@ describe('createHpTracker', () => {
     expect(t.update({ fill: 5, low: false, y: 0.09 })).toBeNull();
     expect(t.update({ fill: 19, low: false, y: 0.041 })!.ratio).toBeCloseTo(0.95);
   });
+
+  it('第一筆就抓到較長的經驗條：之後讀到上面的 HP 列時滿血長度重算', () => {
+    const t = createHpTracker();
+    t.update({ fill: 40, low: false, y: 0.09 });
+    expect(t.update({ fill: 20, low: false, y: 0.04 })!.ratio).toBe(1);
+    expect(t.update({ fill: 10, low: false, y: 0.04 })!.ratio).toBeCloseTo(0.5);
+  });
 });
 
 describe('bossFight', () => {

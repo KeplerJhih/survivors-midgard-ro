@@ -66,6 +66,8 @@ export function createHpTracker(): HpTracker {
       // （實機：滿血卻讀成 0.2 = 經驗 23%，誤觸低血量撤退）→ 當讀不到
       if (r.y !== undefined) {
         if (r.y > hpY + 0.012) return null;
+        // 找到更上面的列＝先前抓到的是下面的條（例如重新載入後第一筆就是經驗條）→ 滿血長度重算
+        if (r.y < hpY - 0.012) full = 0;
         hpY = Math.min(hpY, r.y);
       }
       full = Math.max(full, r.fill);
