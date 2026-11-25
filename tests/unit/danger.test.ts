@@ -160,3 +160,14 @@ describe('findPortalGlow：紫色入口與藍色火焰', () => {
     expect(findPortalGlow(frame(0.3, 0.4, [45, 138, 255]))).toBeNull();
   });
 });
+
+describe('approachExit：出口緊貼角色', () => {
+  it('出口淡藍光落在角色旁邊（原本的角色排除圈內）仍找得到', () => {
+    const W = 160, H = 73;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i++) data.set([150, 130, 90, 255], i * 4);
+    for (let dy = -3; dy <= 3; dy++)
+      for (let dx = -3; dx <= 3; dx++) data.set([160, 215, 250, 255], ((36 + dy) * W + 76 + dx) * 4);
+    expect(approachExit({ width: W, height: H, data })).toEqual(['left']);
+  });
+});

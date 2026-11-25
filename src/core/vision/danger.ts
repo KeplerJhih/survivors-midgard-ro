@@ -163,7 +163,9 @@ export function findPortalGlow(f: Frame, minPixels = 8, match = isPortalGlow): {
       if (fy < 0.13) continue; // 頂部中央的首領/MVP 血條面板（粉紅血條）
       if (GLOW_EXCLUDE.some((z) => fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1)) continue;
       if (match === isExitBlue && fx >= MVP_PANEL.x0 && fx <= MVP_PANEL.x1 && fy >= MVP_PANEL.y0 && fy <= MVP_PANEL.y1) continue;
-      if (Math.hypot((x - W / 2) / H, (y - H / 2) / H) < 0.08) continue; // 角色本身
+      // 角色本身：入口光要排除（角色特效）；出口淡藍光不排除——藍色火焰是深藍、本來就分得開
+      // （實機 Osiris 巢穴：出口就在角色旁邊、落在排除圈內 → 找不到出口，在旁邊的金色因果傳送門附近亂走）
+      if (match !== isExitBlue && Math.hypot((x - W / 2) / H, (y - H / 2) / H) < 0.08) continue;
       ok[y * W + x] = 1;
     }
   const seen = new Uint8Array(W * H);
