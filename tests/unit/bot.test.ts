@@ -293,3 +293,114 @@ describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () 
     expect(bot.state.activity).toBe('retreat');
   });
 });
+
+describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
+  const frame = (v: number) => ({ width: 4, height: 4, data: new Uint8ClampedArray(64).fill(v) });
+
+  it('同一個視窗點 3 次還在 → 與點擊交替按 Enter', async () => {
+    let t = 0;
+    const order: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => (e as KeyboardEvent).code === 'Enter' && order.push('enter'));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => ({ kind: 'modal', x: 0.5, y: 0.7 }),
+        pointer: { tap: async () => void order.push('tap') },
+      },
+    );
+    for (; t < 20000; t += 250) {
+      bot.tick();
+      await new Promise((r) => setTimeout(r, 0)); // 讓按鍵放開
+    }
+    expect(order.slice(0, 6)).toEqual(['tap', 'tap', 'tap', 'enter', 'tap', 'enter']);
+  });
+
+  it('腐化寶箱點不掉也不按 Enter（預設焦點是 Hel）', () => {
+    let t = 0;
+    const sent: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      { keyboard, now: () => t, detectScreen: () => ({ kind: 'corrupt', x: 0.7, y: 0.8 }), pointer: { tap: async () => {} } },
+    );
+    for (; t < 20000; t += 250) bot.tick();
+    expect(sent).not.toContain('Enter');
+  });
+
+  const stillSetup = (clockRuns: boolean) => {
+    let t = 0;
+    let digit = 0;
+    let frozenGame = false;
+    const sent: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => null,
+        pointer: { tap: async () => {} },
+        clockGlyph: () => {
+          if (clockRuns && !frozenGame) digit++;
+          return glyph();
+        },
+        stillFrame: () => frame(frozenGame ? 50 : (t / 250) % 2 ? 0 : 200),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    return { bot, sent, run, pause: () => (frozenGame = true) };
+  };
+
+  it('對局中跳出辨識不到的視窗（畫面整個靜止）→ 4 秒後按 Enter', () => {
+    const { sent, run, pause } = stillSetup(true);
+    run(5000);
+    expect(sent).not.toContain('Enter');
+    pause();
+    run(3000);
+    expect(sent).not.toContain('Enter');
+    run(3000);
+    expect(sent).toContain('Enter');
+  });
+
+  it('不在對局中（時鐘沒走過，例如城鎮）畫面靜止不按 Enter', () => {
+    const { sent, run, pause } = stillSetup(false);
+    pause();
+    run(15000);
+    expect(sent).not.toContain('Enter');
+  });
+
+  it('升級三張普通卡（判成初始技能）不會每次都觸發設定同步', () => {
+    let t = 0;
+    let requests = 0;
+    let show = true;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => (show ? { kind: 'start-skill', x: 0.3, y: 0.5 } : null),
+        pointer: { tap: async () => {} },
+        gameSync: { request: () => void requests++, tick: () => false, busy: false } as never,
+      },
+    );
+    for (let i = 0; i < 5; i++) {
+      show = true;
+      for (let e = 0; e < 2000; e += 250) (t += 250), bot.tick();
+      show = false;
+      for (let e = 0; e < 10000; e += 250) (t += 250), bot.tick();
+    }
+    expect(requests).toBe(1);
+  });
+});

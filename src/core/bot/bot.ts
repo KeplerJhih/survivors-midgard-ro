@@ -11,6 +11,8 @@ import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
 import { createFreezeDetector } from '../vision/clock';
+import type { Frame } from '../vision/frame';
+import { createStillDetector } from '../vision/still';
 import { createMinimapNavigator, type MinimapRead } from '../vision/minimap';
 import { decide, type Activity } from './decide';
 import type { GameSync } from './game-sync';
@@ -64,6 +66,8 @@ export interface BotDeps {
   approachSwirl?: () => Dir[] | null;
   /** MVP 勝利後走向淡藍出口 */
   approachExit?: () => Dir[] | null;
+  /** 低解析度整張畫面（靜止偵測：辨識不到的視窗讓遊戲暫停時按 Enter） */
+  stillFrame?: () => Frame | null;
   /** 遊戲內設定同步（暫停選單勾選框）；需要時 bot 會暫停其他行為 */
   gameSync?: GameSync;
   pointer?: Pointer;
@@ -75,7 +79,15 @@ export interface BotDeps {
 const EXIT_WINDOW = 30000;
 /** 撤退解除前 HP 須連續回到門檻以上的時間 */
 const HP_RECOVER_MS = 3000;
-const INTERVAL = { minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
+/** 對局中畫面靜止多久（且沒辨識到視窗）→ 按 Enter 觸發視窗的預設焦點按鈕 */
+const STILL_MS = 4000;
+/** 備援 Enter 的最短間隔 */
+const ENTER_COOLDOWN = 3000;
+/** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
+const TAPS_BEFORE_ENTER = 3;
+/** 初始技能觸發遊戲設定同步的最短間隔（升級三張普通卡也會被判成初始技能） */
+const SYNC_REQUEST_GAP = 180000;
+const INTERVAL = { still: 1000, minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
 /** 低血量撤退、首領戰風箏的大圈倍數（相對一般走位週期） */
 const RETREAT_FACTOR = 2.5;
 const KITE_FACTOR = 2;
@@ -83,7 +95,8 @@ const KITE_FACTOR = 2;
 /**
  * 掛機主迴圈：感知（節流取樣）→ 視窗處理 → 移動決策（decide.ts，純函式）→ 按鍵。
  * 技能由遊戲自動施放；升級卡另以週期送「1」當備援。
- * （自動 Enter 已移除：腐化寶箱預設焦點是 Hel、城鎮按 Enter 會開世界聊天）
+ * （常駐自動 Enter 已移除：腐化寶箱預設焦點是 Hel、城鎮按 Enter 會開世界聊天；
+ *   現在只在「視窗點了沒反應」或「對局中畫面靜止且辨識不到視窗」時按，作為與畫面大小無關的備援）
  */
 export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   const { keyboard, now, pointer, log } = deps;
@@ -104,12 +117,19 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let hpSeenAt = -Infinity;
   let recoverSince: number | null = null;
   let lastBossAt = -Infinity;
+  /** 目前這個視窗已點過幾次（視窗消失即歸零） */
+  let windowTaps = 0;
+  /** 靜止開始時是否在對局中（null＝畫面在動） */
+  let stillInRun: boolean | null = null;
+  let lastEnter = -Infinity;
+  let lastSyncRequest = -Infinity;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
   const objectSeeker = createObjectSeeker();
   const clock = createFreezeDetector();
   const screens = createScreenHandler();
+  const still = createStillDetector();
   const hpTracker = createHpTracker();
   const bossTracker = createBossTracker();
   const navigator = createMinimapNavigator();
@@ -202,6 +222,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       () => (config.seekObjects && deps.findObjects ? objectSeeker.update(deps.findObjects(), now()) : null),
       null as Dir[] | null,
     ),
+    still: throttle(INTERVAL.still, () => (deps.stillFrame ? still.update(deps.stillFrame(), now()) : null), null as number | null),
     frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? clock.update(deps.clockGlyph(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
@@ -239,18 +260,46 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 點過勝利選擇 / 結算 / 初始技能＝已離開巢穴，不再找出口（寶箱等 modal 不算：勝利後巢穴內也會跳）
         if (act.kind === 'dialog' || act.kind === 'result' || act.kind === 'start-skill') mvpFight = false;
         state.lastScreen = act.kind;
-        log?.info('screen: 點擊', act);
-        void pointer.tap(act.x, act.y);
-        // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步
-        if (act.kind === 'start-skill') deps.gameSync?.request();
+        // 點了幾次視窗還在（畫面大小不同時按鈕位置可能算偏）→ 與點擊交替按 Enter（預設焦點按鈕）。
+        // 腐化寶箱（預設焦點 Hel）、結算頁（焦點不一定是再玩一次）不按
+        const enter =
+          windowTaps >= TAPS_BEFORE_ENTER && windowTaps % 2 === 1 && act.kind !== 'corrupt' && act.kind !== 'result';
+        windowTaps++;
+        if (enter) {
+          log?.info('screen: 點擊無效，改按 Enter', act);
+          void keyboard.tap('enter');
+        } else {
+          log?.info('screen: 點擊', act);
+          void pointer.tap(act.x, act.y);
+        }
+        // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步。
+        // 升級三張普通卡也會被判成初始技能 → 限制頻率，避免對局中一直開暫停選單
+        if (act.kind === 'start-skill' && t - lastSyncRequest >= SYNC_REQUEST_GAP) {
+          lastSyncRequest = t;
+          deps.gameSync?.request();
+        }
       }
       if (sense.screen.fresh) screenStreak = seen ? screenStreak + 1 : 0;
+      if (screenStreak === 0) windowTaps = 0;
       // 連續 2 次取樣都看到視窗才停止移動（單張誤判不該讓角色在戰鬥中停下；真的視窗遊戲本來就暫停）
       if (seen && screenStreak >= 2) {
         for (const d of DIRS) keyboard.up(d);
         state.dirs = [];
         state.activity = 'screen';
         return;
+      }
+
+      // 辨識不到的視窗（畫面大小不同、新視窗）：對局中畫面突然整個靜止 → 遊戲被視窗暫停 → 按 Enter。
+      // 只在靜止開始時時鐘還在走才算（城鎮、載入畫面不按：城鎮 Enter 會開聊天）
+      const stillSince = sense.still.get(t);
+      if (stillSince === null) stillInRun = null;
+      else if (stillInRun === null) stillInRun = clock.ticking;
+      if (!seen && !deps.gameSync?.busy && stillInRun && stillSince !== null && t - stillSince >= STILL_MS && t - lastEnter >= ENTER_COOLDOWN) {
+        lastEnter = t;
+        state.screenTaps++;
+        state.lastScreen = 'still-enter';
+        log?.info('screen: 畫面靜止且辨識不到視窗，按 Enter');
+        void keyboard.tap('enter');
       }
 
       // 遊戲設定同步：只在對局中（時鐘已定位）且沒有視窗時開始

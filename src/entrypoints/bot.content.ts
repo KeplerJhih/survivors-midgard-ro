@@ -103,6 +103,7 @@ export default defineContentScript({
         const frame = sample();
         return frame ? approachExit(frame) : null;
       },
+      stillFrame: sample,
       fleeSwirl: () => {
         const frame = sample();
         return frame ? fleeSwirl(frame) : null;
