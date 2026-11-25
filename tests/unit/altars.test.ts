@@ -97,3 +97,13 @@ describe('findRunner：寶箱方塊不算', () => {
     expect(findRunner(f, SQ)).toBeNull();
   });
 });
+
+describe('findRunner：祭壇圖示不算', () => {
+  it('深色圓底上的黃色圖示（Emperium）→ 不是金波利', () => {
+    const f = frame((set) => {
+      for (let y = -16; y <= 16; y++) for (let x = -16; x <= 16; x++) if (x * x + y * y <= 256) set(200 + x, 120 + y, [16, 16, 29]);
+      for (let y = -8; y <= 8; y++) for (let x = -8; x <= 8; x++) if (Math.abs(x) + Math.abs(y) <= 8) set(200 + x, 120 + y, [255, 219, 56]);
+    });
+    expect(findRunner(f, SQ)).toBeNull();
+  });
+});

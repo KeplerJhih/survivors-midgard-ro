@@ -328,6 +328,18 @@ export function findRunner(f: Frame, sq: Square): Point | null {
         if (0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]! < 110) dark++;
       }
     if (dark > tot * 0.08) continue;
+    // 外圍有祭壇的深色圓底＝祭壇圖示（實機：Emperium 黃色菱形被當成金波利）
+    let disc = 0, ring = 0;
+    const R0 = 0.55 * Math.max(bw, bh), R1 = 1.1 * Math.max(bw, bh);
+    for (let y = Math.round(cy - R1); y <= Math.round(cy + R1); y++)
+      for (let x = Math.round(cx - R1); x <= Math.round(cx + R1); x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d < R0 || d > R1 || x < 0 || y < 0 || x >= w || y >= h) continue;
+        ring++;
+        const i = at(x, y);
+        if (isAltarDisc(data[i]!, data[i + 1]!, data[i + 2]!)) disc++;
+      }
+    if (disc > ring * 0.1) continue;
     if (!best || n > best.n) best = { x: x0 + sx / n, y: y0 + sy / n, n };
   }
   return best ? { x: best.x, y: best.y } : null;
