@@ -1,4 +1,13 @@
-import { HUD_ZONES } from './indicators';
+/**
+ * 找傳送門光時排除的介面區：只排除有彩色亮字的面板（左上資訊、右上小地圖＋右側傷害統計、底部技能列）。
+ * 實機（Payon Forest，1568×713 寬畫面）：右側傷害統計第一列亮黃底落在 y 0.52~0.67，超出原本 HUD 區（到 0.58）
+ * → 被當成入口光往右走；真正的入口在左下角，卻被「觸控搖桿」區整塊排除。搖桿是灰白色，不會被當成光 → 不排除。
+ */
+const GLOW_EXCLUDE = [
+  { x0: 0, y0: 0, x1: 0.24, y1: 0.16 },
+  { x0: 0.85, y0: 0, x1: 1, y1: 0.72 },
+  { x0: 0.38, y0: 0.84, x1: 0.7, y1: 1 },
+];
 import { dirsFromAngle, type Dir } from '../movement/directions';
 import { findBlob, type Frame } from './frame';
 
@@ -150,7 +159,7 @@ export function findPortalGlow(f: Frame, minPixels = 8, match = isPortalGlow): {
       if (!match(data[i]!, data[i + 1]!, data[i + 2]!)) continue;
       const fx = x / W, fy = y / H;
       if (fy < 0.13) continue; // 頂部中央的首領/MVP 血條面板（粉紅血條）
-      if (HUD_ZONES.some((z) => fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1)) continue;
+      if (GLOW_EXCLUDE.some((z) => fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1)) continue;
       if (match === isExitBlue && fx >= MVP_PANEL.x0 && fx <= MVP_PANEL.x1 && fy >= MVP_PANEL.y0 && fy <= MVP_PANEL.y1) continue;
       if (Math.hypot((x - W / 2) / H, (y - H / 2) / H) < 0.08) continue; // 角色本身
       ok[y * W + x] = 1;

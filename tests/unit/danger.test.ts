@@ -119,3 +119,27 @@ describe('findPortalGlow（時間停住時找 MVP 入口光）', () => {
     expect(approachExit(make([{ x: 40, y: 55, r: 5, c: [255, 210, 60] }, { x: 80, y: 90, r: 4, c: [45, 138, 255] }]))).toBeNull();
   });
 });
+
+describe('findPortalGlow 排除區（實機 Payon Forest 寬畫面）', () => {
+  const W = 160, H = 73;
+  const frame = (spots: { x: number; y: number; rgb: [number, number, number] }[]) => {
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i++) data.set([60, 110, 50, 255], i * 4);
+    for (const s of spots)
+      for (let dy = -2; dy <= 2; dy++)
+        for (let dx = -2; dx <= 2; dx++) {
+          const x = Math.round(s.x * W) + dx, y = Math.round(s.y * H) + dy;
+          data.set([...s.rgb, 255], (y * W + x) * 4);
+        }
+    return { width: W, height: H, data };
+  };
+  it('右側傷害統計的亮黃列（y≈0.6）不當成入口光', () => {
+    expect(findPortalGlow(frame([{ x: 0.95, y: 0.6, rgb: [255, 230, 90] }]))).toBeNull();
+  });
+  it('左下角（觸控搖桿區）的入口光照樣找得到', () => {
+    const g = findPortalGlow(frame([{ x: 0.06, y: 0.87, rgb: [255, 150, 40] }]))!;
+    expect(g).not.toBeNull();
+    expect(g.x).toBeLessThan(0);
+    expect(g.y).toBeGreaterThan(0);
+  });
+});
