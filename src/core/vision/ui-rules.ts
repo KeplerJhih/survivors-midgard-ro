@@ -176,7 +176,62 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   if (tile) return tap('modal', tile);
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
   if (frag) return tap('modal', frag);
+  // 最後手段：置中大視窗內、底部的「焦點框」按鈕（Godot 預設焦點的藍框，通常是主要動作）
+  const focus = focusedButton(f, regions);
+  if (focus) return { kind: 'modal', ...focus };
   return null;
+}
+
+/**
+ * 實機：累積 8 個寶箱的清單視窗（高到螢幕邊、card 0.27~0.73 × 0~1）底部「全部販賣」「繼續」邊框太淡、
+ * 內部與面板同色 → 版面切不出任何東西；只有預設焦點的「繼續」有明顯藍框 (b-r ≥ 40)。
+ * 在置中大視窗底部 25% 找藍框外框（寬 2~25%、高 1.5~10%），取最下面的點中心。
+ */
+function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | null {
+  const box = regions.find(
+    (r) => (r.kind === 'panel' || r.kind === 'card') && Math.abs(cx(r) - 0.5) < 0.06 && rw(r) * rh(r) >= 0.15 && r.fill >= 0.5,
+  );
+  if (!box) return null;
+  const { width: W, height: H, data } = f;
+  const x0 = Math.round(box.x0 * W), x1 = Math.round(box.x1 * W);
+  const y0 = Math.round((box.y1 - 0.25 * rh(box)) * H), y1 = Math.min(H, Math.round(box.y1 * H));
+  const ok = new Uint8Array(W * H);
+  for (let y = y0; y < y1; y++)
+    for (let x = x0; x < x1; x++) {
+      const i = (y * W + x) * 4;
+      const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+      if (b >= 150 && b - r >= 40 && b - g >= 20) ok[y * W + x] = 1;
+    }
+  const seen = new Uint8Array(W * H);
+  let best: { x: number; y: number } | null = null;
+  for (let p0 = 0; p0 < W * H; p0++) {
+    if (!ok[p0] || seen[p0]) continue;
+    seen[p0] = 1;
+    const stack = [p0];
+    let n = 0, mnx = W, mxx = 0, mny = H, mxy = 0;
+    while (stack.length) {
+      const p = stack.pop()!;
+      const x = p % W, y = (p / W) | 0;
+      n++;
+      if (x < mnx) mnx = x;
+      if (x > mxx) mxx = x;
+      if (y < mny) mny = y;
+      if (y > mxy) mxy = y;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const q = ny * W + nx;
+          if (ok[q] && !seen[q]) (seen[q] = 1), stack.push(q);
+        }
+    }
+    const w = (mxx - mnx + 1) / W, h = (mxy - mny + 1) / H;
+    const perimeter = 2 * (mxx - mnx + mxy - mny + 2);
+    if (w < 0.02 || w > 0.25 || h < 0.015 || h > 0.1 || n < perimeter * 0.3) continue;
+    const c = { x: (mnx + mxx + 1) / 2 / W, y: (mny + mxy + 1) / 2 / H };
+    if (!best || c.y > best.y) best = c;
+  }
+  return best;
 }
 
 /**

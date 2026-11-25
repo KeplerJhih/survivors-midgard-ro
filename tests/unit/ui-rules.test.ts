@@ -284,6 +284,19 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeLessThan(0.49);
   });
 
+  it('寶箱長清單：底部按鈕切不出來，只有預設焦點的藍框 → 點藍框', () => {
+    const f = draw(GRASS, [{ x0: 0.266, y0: 0.01, x1: 0.734, y1: 0.995, fill: PANEL }]);
+    // 藍色焦點外框（2px），內部與面板同色
+    const X0 = Math.round(0.53 * W), X1 = Math.round(0.58 * W), Y0 = Math.round(0.92 * H), Y1 = Math.round(0.97 * H);
+    for (let y = Y0; y < Y1; y++)
+      for (let x = X0; x < X1; x++)
+        if (x <= X0 + 1 || x >= X1 - 2 || y <= Y0 + 1 || y >= Y1 - 2) (f.data as Uint8ClampedArray).set([90, 110, 220, 255], (y * W + x) * 4);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeCloseTo(0.555, 1);
+    expect(a.y).toBeGreaterThan(0.9);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },
