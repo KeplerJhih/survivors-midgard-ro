@@ -124,7 +124,7 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     if (p && rw(p) < 0.8) return tap('dialog', bottom[1]!);
   }
   // 小面板內上下疊兩顆等寬的寬按鈕（MVP 勝利「繼續無盡模式／結束本局」）→ 點上面那顆（遊戲預設焦點、主要選項）
-  const stacked = stackedPair(regions, buttons);
+  const stacked = stackedPair(regions, buttons) ?? mergedStack(regions);
   if (stacked) return tap('dialog', stacked);
   // 置中、獨立的亮區塊，且周圍被壓暗（遮罩）→ 對話框；按鈕一律靠右下（ALIGNMENT_END）→ 點右下角
   // 實機：「不存放就離開？」的兩顆小按鈕邊框太淡切不出來，整個對話框被當成一塊
@@ -183,6 +183,21 @@ function stackedPair(regions: Region[], buttons: Region[]): Region | null {
     if (inner.length !== 2) continue;
     const [top, bottom] = inner as [Region, Region];
     if (Math.abs(cx(top) - cx(bottom)) < 0.02 && Math.abs(rw(top) - rw(bottom)) < 0.03 && bottom.y0 - top.y1 < 0.1) return top;
+  }
+  return null;
+}
+
+/**
+ * 同上，但兩顆按鈕間距太小被版面合併成一塊（實機全解析：面板 0.352~0.647 × 0.359~0.641，
+ * 合併塊 0.367~0.633 × 0.526~0.618、高 0.092 ≈ 兩顆按鈕）→ 回傳上半部（上面那顆按鈕）。
+ */
+function mergedStack(regions: Region[]): Region | null {
+  for (const p of regions) {
+    if ((p.kind !== 'panel' && p.kind !== 'card') || rw(p) * rh(p) > 0.15 || rw(p) * rh(p) < 0.03) continue;
+    const m = regions.find(
+      (r) => r !== p && inside(r, p, 0.01) && rw(r) >= 0.8 * rw(p) && rh(r) >= 0.07 && rh(r) <= 0.13 && cy(r) > cy(p) && r.fill >= 0.6,
+    );
+    if (m) return { ...m, y1: m.y0 + rh(m) / 2 };
   }
   return null;
 }

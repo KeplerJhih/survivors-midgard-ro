@@ -259,6 +259,17 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeGreaterThan(0.51);
   });
 
+  it('MVP 勝利選擇：兩顆按鈕被合併成一塊 → 點上半部（繼續無盡模式）', () => {
+    const f = draw([40, 45, 55], [
+      { x0: 0.352, y0: 0.359, x1: 0.647, y1: 0.641, fill: PANEL },
+      { x0: 0.367, y0: 0.526, x1: 0.633, y1: 0.618, fill: BTN, border: [189, 201, 230] },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.y).toBeGreaterThan(0.53);
+    expect(a.y).toBeLessThan(0.56);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },
