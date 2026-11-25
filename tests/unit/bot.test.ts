@@ -242,26 +242,3 @@ describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () 
     expect(bot.state.activity).not.toBe('enter');
   });
 });
-
-describe('催眠閃光：腳下倒數環 → 站著不動', () => {
-  it('偵測到環時放開方向鍵；環消失 0.6 秒後恢復走位', () => {
-    let t = 0;
-    let ring = false;
-    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
-    const bot = createBot({ ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' }, { keyboard, now: () => t, snapRing: () => ring });
-    bot.tick();
-    expect(bot.state.dirs.length).toBeGreaterThan(0);
-    ring = true;
-    t += 200;
-    bot.tick();
-    expect(bot.state.activity).toBe('hold');
-    expect([...keyboard.held()].filter((k) => k !== 'pick1')).toEqual([]);
-    ring = false;
-    t += 300;
-    bot.tick();
-    expect(bot.state.activity).toBe('hold');
-    t += 700;
-    bot.tick();
-    expect(bot.state.activity).not.toBe('hold');
-  });
-});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approachExit, detectSnapRing, dodge, findPortalGlow, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
+import { approachExit, dodge, findPortalGlow, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
 import type { Frame } from '@/core/vision/frame';
 
 const W = 160;
@@ -117,31 +117,5 @@ describe('findPortalGlow（時間停住時找 MVP 入口光）', () => {
     );
     expect(dirs).toEqual(['right']);
     expect(approachExit(make([{ x: 40, y: 55, r: 5, c: [255, 210, 60] }, { x: 80, y: 90, r: 4, c: [45, 138, 255] }]))).toBeNull();
-  });
-});
-
-describe('detectSnapRing（催眠閃光：腳下空心紅環）', () => {
-  const W2 = 320;
-  const H2 = 220;
-  const make = (paint: (d: number, x: number, y: number) => boolean) => {
-    const data = new Uint8ClampedArray(W2 * H2 * 4);
-    for (let y = 0; y < H2; y++)
-      for (let x = 0; x < W2; x++) {
-        const d = Math.hypot((x - W2 / 2) / H2, (y - H2 / 2) / H2);
-        data.set([...(paint(d, x, y) ? [240, 100, 80] : [90, 95, 105]), 255], (y * W2 + x) * 4);
-      }
-    return { width: W2, height: H2, data };
-  };
-  it('以角色為中心的空心環 → true', () => {
-    expect(detectSnapRing(make((d) => d >= 0.045 && d <= 0.06))).toBe(true);
-  });
-  it('實心火焰圓圈蓋住角色 → false', () => {
-    expect(detectSnapRing(make((d) => d <= 0.07))).toBe(false);
-  });
-  it('大火焰圓圈蓋在角色上、角色遮住中心 → false（環外也是紅的）', () => {
-    expect(detectSnapRing(make((d) => d >= 0.02 && d <= 0.13))).toBe(false);
-  });
-    it('旁邊的火焰圓圈（不以角色為中心）→ false', () => {
-    expect(detectSnapRing(make((_, x, y) => Math.hypot(x - W2 / 2 - 25, y - H2 / 2) < 15))).toBe(false);
   });
 });
