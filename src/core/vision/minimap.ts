@@ -60,7 +60,17 @@ export function findMinimapSquare(f: Frame): Square | null {
       if (Math.abs(gap - a.len) > a.len * 0.08) continue;
       if (!found || a.len > found.x1 - found.x0) found = { x0: a.x0, y0: a.y, x1: a.x0 + a.len, y1: b.y };
     }
-  return found;
+  if (found) return found;
+  // 底邊被角色/首領圖示壓斷（實機：角色走到地圖下緣，底邊只剩 123/221 px）：
+  // 上邊在「上邊 + 邊長」附近有一段落在同一水平範圍內的殘段 → 方框是正方形，底邊 = 上邊 + 邊長。
+  // （不能只取最長線：外層面板邊框 y=47 長 310 比方框還長）
+  for (const a of [...firsts].sort((p, q) => q.len - p.len)) {
+    const bottom = firsts.find(
+      (b) => Math.abs(b.y - (a.y + a.len)) <= a.len * 0.08 && b.x0 >= a.x0 - 3 && b.x0 + b.len <= a.x0 + a.len + 3,
+    );
+    if (bottom) return { x0: a.x0, y0: a.y, x1: a.x0 + a.len, y1: a.y + a.len };
+  }
+  return null;
 }
 
 const isArrow = (r: number, g: number, b: number) => r >= 200 && g <= 70 && b <= 50 && g >= b - 5;
