@@ -150,6 +150,31 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   /** 這局打倒過 MVP（結算頁可免費帶 3 件回倉庫）、已帶幾件 */
   let wonMvpThisRun = false;
   let keepTaken = 0;
+  /** 目前分頁（以按下的分頁 x 位置識別）、這頁點了幾格、試過切到哪些分頁 */
+  let keepPage: number | null = null;
+  let keepPageTaps = 0;
+  const keepTabTried = new Set<number>();
+  const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
+    const tabs = act.keepTabs ?? [];
+    const cur = tabs.find((t) => t.pressed);
+    const page = cur ? Math.round(cur.x * 100) : -1;
+    if (page !== keepPage) {
+      keepPage = page;
+      keepPageTaps = 0;
+    }
+    const tile = act.keep?.[keepPageTaps];
+    if (tile) {
+      keepPageTaps++;
+      keepTaken++;
+      return { ...tile, what: 'item' };
+    }
+    // 這頁點完了：切到目前分頁右邊的下一個（只往右、每個試一次）
+    if (!cur) return null;
+    const next = tabs.filter((t) => t.x > cur.x + 0.01).sort((a, b) => a.x - b.x)[0];
+    if (!next || keepTabTried.has(Math.round(next.x * 100))) return null;
+    keepTabTried.add(Math.round(next.x * 100));
+    return { x: next.x, y: next.y, what: 'tab' };
+  };
   let detourUntil = -Infinity;
   let detourDirs: Dir[] = [];
   let detourCw = false;
@@ -404,12 +429,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         windowTaps++;
         // 破關（打倒過 MVP）的結算頁：先免費帶 3 件回 Kafra 倉庫（不帶就離開會被賣掉），再點再玩一次。
         // 每格只點一次（再點一次＝取消保存）
-        const keep = act.kind === 'result' && wonMvpThisRun && act.keep ? act.keep : [];
-        const keepTile = keepTaken < KEEP_FREE ? keep[keepTaken] : undefined;
-        if (keepTile) {
-          keepTaken++;
-          log?.info('result: 帶回倉庫', keepTaken, keepTile);
-          void pointer.tap(keepTile.x, keepTile.y);
+        // 只顯示目前稀有度分頁（傳說 > 紫色 > 其餘，預設停在最高的）；這頁不足 3 件 → 切到右邊下一頁繼續
+        const keepStep = act.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE ? nextKeep(act) : null;
+        if (keepStep) {
+          log?.info('result: 帶回倉庫', keepStep.what, keepTaken);
+          void pointer.tap(keepStep.x, keepStep.y);
         } else if (enter) {
           log?.info('screen: 點擊無效，改按 Enter', act);
           void keyboard.tap('enter');
@@ -419,6 +443,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           if (act.kind === 'result') {
             wonMvpThisRun = false; // 離開結算頁＝下一局重新計
             keepTaken = 0;
+            keepPage = null;
+            keepPageTaps = 0;
+            keepTabTried.clear();
           }
         }
         // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步。

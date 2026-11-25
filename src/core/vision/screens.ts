@@ -36,6 +36,8 @@ export interface ScreenAction {
   y: number;
   /** 結算頁「帶回 Kafra 倉庫」物品格（由左到右、已排除倉庫已有的），破關時免費帶 3 件 */
   keep?: { x: number; y: number }[];
+  /** 物品格上方的稀有度分頁（由左到右：傳說、紫色、其餘；停用的切不出來），pressed＝目前分頁 */
+  keepTabs?: { x: number; y: number; pressed: boolean }[];
 }
 
 const isLight = (r: number, g: number, b: number) =>

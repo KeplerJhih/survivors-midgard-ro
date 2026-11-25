@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Frame } from '@/core/vision/frame';
 import { parseLayout } from '@/core/vision/layout';
-import { decideByLayout, keepTiles } from '@/core/vision/ui-rules';
+import { decideByLayout, keepTabs, keepTiles } from '@/core/vision/ui-rules';
 
 type RGB = [number, number, number];
 const W = 640;
@@ -395,6 +395,17 @@ describe('結算頁帶回 Kafra 倉庫物品格', () => {
     expect(k[0]!.x).toBeCloseTo(0.21, 2);
     expect(k.some((t) => t.x > 0.5 && t.x < 0.53)).toBe(false);
   });
+  it('物品格上方的稀有度分頁：目前分頁（按下、較暗）標 pressed', () => {
+    const tabs = [
+      { kind: 'button' as const, x0: 0.475, y0: 0.67, x1: 0.523, y1: 0.718, fill: 0.56, luma: 222 },
+      { kind: 'button' as const, x0: 0.527, y0: 0.674, x1: 0.564, y1: 0.711, fill: 0.5, luma: 252 },
+    ];
+    const k = keepTiles(regions, 1568 / 713);
+    const t = keepTabs([...regions, ...tabs], k);
+    expect(t.map((x) => x.pressed)).toEqual([true, false]);
+    expect(t[1]!.x).toBeCloseTo(0.5455, 3);
+  });
+
   it('上半部的技能圖示列不算', () => {
     const icons = [0.3, 0.34, 0.38, 0.42, 0.46].map((x) => ({ kind: 'other' as const, x0: x, y0: 0.3, x1: x + 0.03, y1: 0.36, fill: 0.6, luma: 200 }));
     expect(keepTiles(icons, 1568 / 713)).toEqual([]);

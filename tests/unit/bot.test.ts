@@ -927,3 +927,64 @@ describe('破關結算頁帶回 3 件', () => {
     expect(setup(false)[0]).toBe(0.47);
   });
 });
+
+describe('破關帶回：最高分頁不足 3 件', () => {
+  it('傳說頁只有 1 件 → 點完切到紫色頁再點 2 件，最後才再玩一次', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    let result = false;
+    let page: 'legend' | 'purple' = 'legend';
+    const taps: string[] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const tabs = () => [
+      { x: 0.45, y: 0.69, pressed: page === 'legend' },
+      { x: 0.5, y: 0.69, pressed: page === 'purple' },
+      { x: 0.55, y: 0.69, pressed: false },
+    ];
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => null,
+        detectScreen: () =>
+          result
+            ? {
+                kind: 'result',
+                x: 0.47,
+                y: 0.94,
+                keep: page === 'legend' ? [{ x: 0.2, y: 0.8 }] : [0.3, 0.34, 0.38, 0.42].map((x) => ({ x, y: 0.8 })),
+                keepTabs: tabs(),
+              }
+            : null,
+        pointer: {
+          tap: async (x, y) => {
+            if (y < 0.7 && Math.abs(x - 0.5) < 0.01) page = 'purple';
+            taps.push(`${x}`);
+          },
+        },
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(4000);
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(8000);
+    result = true;
+    run(20000);
+    expect(taps.slice(0, 5)).toEqual(['0.2', '0.5', '0.3', '0.34', '0.47']);
+  });
+});

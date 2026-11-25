@@ -71,7 +71,26 @@ export function decideByLayout(
   const act = decideCore(f, regions, rarity, opts);
   if (act?.kind !== 'result') return act;
   const keep = keepTiles(regions, f.width / f.height);
-  return keep.length ? { ...act, keep } : act;
+  if (!keep.length) return act;
+  return { ...act, keep, keepTabs: keepTabs(regions, keep) };
+}
+
+/**
+ * 物品格正上方一排按鈕＝稀有度分頁（_keep_section：傳說 / 紫色 / 其餘，0 件的停用、切不出來）。
+ * 實機（1568×713）：格頂 0.763，分頁 y 0.67~0.72；目前分頁是按下狀態、比較暗（亮度 222 vs 252）。
+ */
+export function keepTabs(regions: Region[], keep: { x: number; y: number }[]): { x: number; y: number; pressed: boolean }[] {
+  const rowY = keep[0]!.y;
+  const tabs = regions
+    .filter((r) => r.kind === 'button' && cy(r) < rowY - 0.05 && cy(r) > rowY - 0.2)
+    .sort((a, b) => a.x0 - b.x0);
+  if (!tabs.length) return [];
+  // 只取同一排（中心高度相近）的
+  const y0 = cy(tabs[0]!);
+  const row = tabs.filter((t) => Math.abs(cy(t) - y0) <= 0.02);
+  const minL = Math.min(...row.map((t) => t.luma));
+  const maxL = Math.max(...row.map((t) => t.luma));
+  return row.map((t) => ({ x: cx(t), y: cy(t), pressed: maxL - minL >= 12 && t.luma === minL }));
 }
 
 /**
