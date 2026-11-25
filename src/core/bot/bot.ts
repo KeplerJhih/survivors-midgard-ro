@@ -40,6 +40,8 @@ export interface BotState {
   scans: number;
   ticks: number;
   picks: number;
+  /** 小地圖上看到的祭壇（除錯用） */
+  altars: string[];
 }
 
 export interface Bot {
@@ -92,6 +94,9 @@ const STUCK_MS = 1500;
 const DETOUR_MS = 2000;
 /** 小地圖上移動超過這麼多像素才算有在走；按著方向鍵 MINIMAP_STUCK_MS 都沒超過＝撞牆 */
 const MINIMAP_MOVE_PX = 2;
+/** 祭壇：小地圖上離祭壇中心這麼近就站著等觸發；多久沒成功就放棄 */
+const ALTAR_ARRIVE = 0.09;
+const ALTAR_GIVE_UP_MS = 25000;
 const MINIMAP_STUCK_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
@@ -145,6 +150,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let mmSeenAt = -Infinity;
   /** 小地圖位置真正變化的時間（不因切換動作而重設；判斷「遊戲被暫停」用） */
   let mmChangedAt = -Infinity;
+  /** 祭壇：最近讀到的小地圖、目前要去的祭壇與放棄清單 */
+  let mmLast: MinimapRead | null = null;
+  let altarGoal: { id: string; x: number; y: number; since: number } | null = null;
+  const altarGiveUp: { x: number; y: number; until: number }[] = [];
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -170,6 +179,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     scans: 0,
     ticks: 0,
     picks: 0,
+    altars: [],
   };
 
   // ---- 感知（節流）----
@@ -227,6 +237,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (!m) return null;
         navigator.observe(m.player, state.dirs, now());
         mmSeenAt = now();
+        mmLast = m;
+        state.altars = (m.altars ?? []).map((a) => a.id);
         if (!mmPos || Math.hypot(m.player.x - mmPos.x, m.player.y - mmPos.y) > MINIMAP_MOVE_PX) {
           mmPos = m.player;
           mmMovedAt = now();
@@ -267,6 +279,37 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
+  };
+
+  /**
+   * 祭壇：依小地圖走到勾選的祭壇上，到了就站著（回傳 []）等 2 秒觸發；觸發後標記消失。
+   * 25 秒還沒成功（走不到、站不準）就放棄這座 60 秒。
+   */
+  const seekAltar = (t: number): Dir[] | null => {
+    const m = mmLast;
+    if (!m || t - mmSeenAt > 1500) return null;
+    const want = (m.altars ?? []).filter(
+      (a) => config.altars?.[a.id] && !altarGiveUp.some((g) => g.until > t && Math.hypot(g.x - a.x, g.y - a.y) < 8),
+    );
+    if (!want.length) {
+      altarGoal = null;
+      return null;
+    }
+    const a = want.reduce((p, q) =>
+      Math.hypot(p.x - m.player.x, p.y - m.player.y) <= Math.hypot(q.x - m.player.x, q.y - m.player.y) ? p : q,
+    );
+    if (!altarGoal || altarGoal.id !== a.id || Math.hypot(altarGoal.x - a.x, altarGoal.y - a.y) > 8) {
+      altarGoal = { id: a.id, x: a.x, y: a.y, since: t };
+      log?.info('altar: 前往祭壇', a.id);
+    }
+    if (t - altarGoal.since > ALTAR_GIVE_UP_MS) {
+      altarGiveUp.push({ x: a.x, y: a.y, until: t + 60000 });
+      log?.info('altar: 放棄', a.id);
+      altarGoal = null;
+      return null;
+    }
+    // 觸發半徑 1.8 單位：實機小地圖約 1.7 px/單位、圓底直徑 32 px → 約 0.09 個圓底直徑
+    return navigator.steer(m.player, a, Math.max(1.5, ALTAR_ARRIVE * a.d)) ?? (navigator.calibrated ? [] : null);
   };
 
   return {
@@ -387,7 +430,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
       const bossSeek = sense.bossSeek.get(t);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
-      const target = busy ? null : bossSeek ?? sense.target.get(t);
+      const altar = busy || bossSeek ? null : seekAltar(t);
+      const target = busy ? null : bossSeek ?? altar ?? sense.target.get(t);
       const object = busy || target ? null : sense.object.get(t);
       const elapsed = t - startedAt;
       const { activity, want: decided } = decide(

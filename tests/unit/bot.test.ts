@@ -641,3 +641,39 @@ describe('結算頁蓋住 HUD 時不按 Enter', () => {
     expect(sent).not.toContain('Enter');
   });
 });
+
+describe('祭壇', () => {
+  const run = (altarsOn: Record<string, boolean>) => {
+    let t = 0;
+    let p = { x: 100, y: 100 };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const altar = { id: 'yggdrasil' as const, x: 60, y: 100, d: 32 };
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'flower', altars: altarsOn },
+      { keyboard, now: () => t, readMinimap: () => ({ player: { ...p }, boss: null, altars: [altar] }) },
+    );
+    const acts: string[] = [];
+    for (; t < 20000; t += 100) {
+      bot.tick();
+      const held = bot.state.dirs;
+      p = {
+        x: p.x + ((held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0)) * 0.3,
+        y: p.y - ((held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0)) * 0.3,
+      };
+      acts.push(bot.state.activity);
+    }
+    return { p, acts, bot };
+  };
+
+  it('勾選的祭壇：校正小地圖方向後走過去並站著', () => {
+    const { p, bot } = run({ yggdrasil: true });
+    expect(Math.hypot(p.x - 60, p.y - 100)).toBeLessThan(4);
+    expect(bot.state.activity).toBe('target');
+    expect(bot.state.dirs).toEqual([]);
+  });
+
+  it('沒勾選的祭壇不去', () => {
+    const { acts } = run({ yggdrasil: false });
+    expect(acts.filter((a) => a === 'target')).toEqual([]);
+  });
+});

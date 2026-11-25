@@ -1,4 +1,5 @@
 import type { MoveMode } from './movement/strategies';
+import type { AltarId } from './vision/minimap';
 
 export interface BotConfig {
   enabled: boolean;
@@ -22,6 +23,8 @@ export interface BotConfig {
   autoContinue: boolean;
   /** 轉職（Base Lv 20）選哪條路：左（第一條，遊戲預設）/ 右（第二條）；只有一條路的職業不受影響 */
   jobPath: 'first' | 'second';
+  /** 自動前往觸發的祭壇（每座都有代價，預設只開沒有代價的 Yggdrasil） */
+  altars: Partial<Record<AltarId, boolean>>;
 }
 
 /** 遊戲內的勾選設定：on/off 由外掛在暫停選單同步，keep 不動 */
@@ -67,6 +70,7 @@ export const DEFAULT_SETTINGS: Settings = {
     bossKite: true,
     autoContinue: true,
     jobPath: 'first',
+    altars: { yggdrasil: true },
   },
 };
 
@@ -75,5 +79,11 @@ export function mergeSettings(raw: unknown): Settings {
   const p = (raw && typeof raw === 'object' ? raw : {}) as Partial<Settings>;
   const bot = (p.bot && typeof p.bot === 'object' ? p.bot : {}) as Partial<BotConfig>;
   const game = (p.game && typeof p.game === 'object' ? p.game : {}) as Partial<GameToggles>;
-  return { ...DEFAULT_SETTINGS, ...p, bot: { ...DEFAULT_SETTINGS.bot, ...bot }, game: { ...DEFAULT_SETTINGS.game, ...game } };
+  const altars = bot.altars && typeof bot.altars === 'object' ? bot.altars : {};
+  return {
+    ...DEFAULT_SETTINGS,
+    ...p,
+    bot: { ...DEFAULT_SETTINGS.bot, ...bot, altars: { ...DEFAULT_SETTINGS.bot.altars, ...altars } },
+    game: { ...DEFAULT_SETTINGS.game, ...game },
+  };
 }

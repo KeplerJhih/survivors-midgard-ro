@@ -18,6 +18,122 @@ export interface Point {
 export interface MinimapRead {
   player: Point;
   boss: Point | null;
+  /** 小地圖上的祭壇標記（已排除催眠師） */
+  altars?: AltarMark[];
+}
+
+/**
+ * 祭壇（core/altars.gd、ui/ro_minimap.gd ALTAR_LOOK）：小地圖上畫「深色圓底 (0.05,0.05,0.1) 半徑 7」＋閃爍外環＋中間圖示，
+ * 圖示形狀與顏色依祭壇固定（遊戲用來區分祭壇的識別）。站進半徑 1.8 的圈內連續 2 秒即觸發（ALTAR_CHANNEL）。
+ * 實機（3840 寬、Byalan Island）：圓底 (16,16,29)/(36,36,47)、直徑約 32 px（小地圖邊長 338 px 的 0.095）；
+ * Niflheim 十字 (173,107,255) 與程式碼顏色完全一致。
+ */
+export type AltarId =
+  | 'odin'
+  | 'thor'
+  | 'freyja'
+  | 'emperium'
+  | 'baldur'
+  | 'loki'
+  | 'yggdrasil'
+  | 'niflheim'
+  | 'valkyrie'
+  | 'hel';
+
+export const ALTAR_COLORS: Record<AltarId, [number, number, number]> = {
+  odin: [230, 237, 255],
+  thor: [77, 148, 255],
+  freyja: [255, 133, 51],
+  emperium: [255, 219, 56],
+  baldur: [255, 247, 179],
+  loki: [158, 242, 46],
+  yggdrasil: [51, 230, 199],
+  niflheim: [173, 107, 255],
+  valkyrie: [255, 140, 194],
+  hel: [235, 36, 56],
+};
+
+export interface AltarMark extends Point {
+  id: AltarId;
+  /** 圓底直徑（px）：與小地圖同比例縮放，用來換算「站上去」的距離 */
+  d: number;
+}
+
+/** 祭壇深色圓底：近黑、略偏藍 */
+const isAltarDisc = (r: number, g: number, b: number) => r <= 50 && Math.abs(r - g) <= 6 && b - r >= 6 && b - r <= 20;
+const DISC_BG: [number, number, number] = [16, 16, 29];
+
+/** 與圖示色（不透明或 90% 不透明疊在圓底上）的距離 */
+function glyphDist(r: number, g: number, b: number, c: [number, number, number]): number {
+  const d1 = Math.hypot(r - c[0], g - c[1], b - c[2]);
+  const m = c.map((v, k) => 0.9 * v + 0.1 * DISC_BG[k]!);
+  const d2 = Math.hypot(r - m[0]!, g - m[1]!, b - m[2]!);
+  return Math.min(d1, d2);
+}
+
+/** 在小地圖方框內找祭壇標記並辨識是哪一座 */
+export function findAltars(f: Frame, sq: Square): AltarMark[] {
+  const { width: W, data } = f;
+  const side = sq.x1 - sq.x0;
+  const minD = 0.05 * side;
+  const maxD = 0.16 * side;
+  const x0 = Math.max(0, Math.floor(sq.x0)), x1 = Math.min(W, Math.ceil(sq.x1));
+  const y0 = Math.max(0, Math.floor(sq.y0)), y1 = Math.min(f.height, Math.ceil(sq.y1));
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 0 || h <= 0) return [];
+  const at = (x: number, y: number) => ((y0 + y) * W + x0 + x) * 4;
+  const seen = new Uint8Array(w * h);
+  const out: AltarMark[] = [];
+  for (let s = 0; s < w * h; s++) {
+    if (seen[s]) continue;
+    const sx = s % w, sy = (s / w) | 0;
+    const i0 = at(sx, sy);
+    if (!isAltarDisc(data[i0]!, data[i0 + 1]!, data[i0 + 2]!)) continue;
+    seen[s] = 1;
+    const stack = [s];
+    let mnx = w, mxx = 0, mny = h, mxy = 0;
+    while (stack.length) {
+      const p = stack.pop()!;
+      const x = p % w, y = (p / w) | 0;
+      if (x < mnx) mnx = x;
+      if (x > mxx) mxx = x;
+      if (y < mny) mny = y;
+      if (y > mxy) mxy = y;
+      for (const q of [p - 1, p + 1, p - w, p + w]) {
+        if (q < 0 || q >= w * h || seen[q]) continue;
+        if (Math.abs((q % w) - x) > 1) continue;
+        const i = at(q % w, (q / w) | 0);
+        if (!isAltarDisc(data[i]!, data[i + 1]!, data[i + 2]!)) continue;
+        seen[q] = 1;
+        stack.push(q);
+      }
+    }
+    const bw = mxx - mnx + 1, bh = mxy - mny + 1;
+    if (bw < minD || bh < minD || bw > maxD || bh > maxD || bw / bh < 0.7 || bw / bh > 1.4) continue;
+    // 圓底內的圖示像素：依顏色投票
+    const counts = new Map<AltarId, number>();
+    const ix0 = mnx + Math.round(bw * 0.15), ix1 = mxx - Math.round(bw * 0.15);
+    const iy0 = mny + Math.round(bh * 0.15), iy1 = mxy - Math.round(bh * 0.15);
+    for (let y = iy0; y <= iy1; y++)
+      for (let x = ix0; x <= ix1; x++) {
+        const i = at(x, y);
+        const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
+        let best: AltarId | null = null;
+        let bd = 16;
+        for (const id of Object.keys(ALTAR_COLORS) as AltarId[]) {
+          const d = glyphDist(r, g, b, ALTAR_COLORS[id]);
+          if (d < bd) (bd = d), (best = id);
+        }
+        if (best) counts.set(best, (counts.get(best) ?? 0) + 1);
+      }
+    const inner = (ix1 - ix0 + 1) * (iy1 - iy0 + 1);
+    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top || top[1] < Math.max(4, inner * 0.03)) continue;
+    // 催眠師（實心紫圓＋螺旋，顏色接近 Niflheim）：紫色填滿比例高 → 不是祭壇
+    if (top[0] === 'niflheim' && top[1] / inner > 0.35) continue;
+    out.push({ id: top[0], x: x0 + mnx + bw / 2, y: y0 + mny + bh / 2, d: (bw + bh) / 2 });
+  }
+  return out;
 }
 
 export interface Square {
@@ -129,7 +245,12 @@ export function readMinimap(f: Frame): MinimapRead | null {
     blobs(f, isBossDot)
       .filter((b) => b.n >= area * 0.00001 && Math.hypot(b.x - arrow.x, b.y - arrow.y) > 6)
       .sort((a, b) => b.n - a.n)[0] ?? null;
-  return { player: { x: arrow.x, y: arrow.y }, boss: boss ? { x: boss.x, y: boss.y } : null };
+  const sq = findMinimapSquare(f);
+  return {
+    player: { x: arrow.x, y: arrow.y },
+    boss: boss ? { x: boss.x, y: boss.y } : null,
+    altars: sq ? findAltars(f, sq) : [],
+  };
 }
 
 /** 按住的方向鍵 → 畫面向量（右 +x、上 +y） */
