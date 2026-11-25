@@ -1032,6 +1032,8 @@ describe('一般首領戰中被視窗短暫暫停', () => {
         },
         bossBar: () => bar,
         approachExit: () => ['up'],
+        detectScreen: () => (clockRuns ? null : { kind: 'modal', x: 0.5, y: 0.7 }),
+        pointer: { tap: async () => {} },
       },
     );
     const run = (ms: number) => {
@@ -1042,12 +1044,48 @@ describe('一般首領戰中被視窗短暫暫停', () => {
       }
     };
     run(5000);
-    clockRuns = false; // 視窗暫停
+    clockRuns = false; // 視窗暫停（畫面上有視窗）
     run(4000);
     clockRuns = true;
     run(3000);
     bar = 0; // 首領被打倒
     run(4000);
     expect(bot.state.activity).not.toBe('enter');
+  });
+});
+
+describe('巢穴：時鐘剛停住首領就出現（載入後立刻開打）', () => {
+  it('沒有視窗 → 仍判定為巢穴戰，打完找出口', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => ['up'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(3500); // 停住剛被判定
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(2000);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['up']);
   });
 });

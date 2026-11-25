@@ -95,8 +95,8 @@ const STILL_MS = 4000;
 const STILL_CLOCK_GAP = 4000;
 /** 時鐘在這段時間內還有走動＝遊戲進行中（沒有視窗暫停） */
 const GAME_RUNNING_MS = 2000;
-/** 時鐘連續停住多久才算在 MVP 巢穴裡（視窗造成的短暫暫停不算） */
-const LAIR_FROZEN_MS = 4000;
+/** 時鐘停住且最近這段時間沒看到視窗，才算在 MVP 巢穴裡（視窗造成的暫停不算） */
+const LAIR_NO_WINDOW_MS = 5000;
 /** 勝利後看不到出口：沿最後方向走多久、原地等到多久才交回一般走位 */
 const EXIT_COAST_MS = 3000;
 const EXIT_WAIT_MS = 12000;
@@ -196,7 +196,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   /** 時間剛停住（入口剛開）時玩家在小地圖上的位置：入口一定生在這附近 4~6.5 單位內（mvp_raid.gd _portal_point） */
   let portalHome: { x: number; y: number } | null = null;
   let wasFrozen = false;
-  let frozenSince = -Infinity;
+  let lastWindowAt = -Infinity;
   /** 巢穴內（時間停著）點過對話框：時鐘恢復走動＝回到地圖 → 不必再找出口 */
   let lairDialog = false;
   let altarGoal: { id: string; x: number; y: number; since: number } | null = null;
@@ -440,6 +440,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       sense.frozen.get(t);
       const gameRunning = clock.ticking && t - clock.changedAt < GAME_RUNNING_MS;
       const rawSeen = deps.gameSync?.busy ? null : sense.screen.get(t);
+      if (rawSeen) lastWindowAt = t;
       const seen = gameRunning ? null : rawSeen;
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
@@ -542,7 +543,6 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const portal = sense.portal.get(t);
       const frozen = sense.frozen.get(t);
       state.frozen = frozen;
-      if (frozen && !wasFrozen) frozenSince = t;
       if (frozen && !wasFrozen && !mvpFight) portalHome = mmLast && t - mmSeenAt < 1500 ? { ...mmLast.player } : null;
       if (!frozen) portalHome = null;
       wasFrozen = frozen;
@@ -550,9 +550,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 實機：無盡模式勝利後巢穴內時鐘恢復走動 → 不能靠「停住」判斷，改成首領消失後 30 秒內都找出口
       if (vitals.boss) {
         lastBossAt = t;
-        // 巢穴內時鐘一路停著；一般首領戰中被視窗暫停只會停一下（實機：寶箱視窗讓時鐘停 → 被當成巢穴，
-        // 打完首領在地圖上「找出口」亂轉，還靠近催眠師）→ 時鐘要連續停 4 秒以上才算巢穴
-        if (frozen && t - frozenSince >= LAIR_FROZEN_MS) {
+        // 一般首領戰中時鐘停住一定是視窗暫停（實機：寶箱視窗讓時鐘停 → 被當成巢穴，打完在地圖上找出口亂轉）；
+        // 巢穴內時鐘停住時沒有視窗 → 最近 5 秒沒看到視窗才算巢穴。
+        // （原本「連續停 4 秒」不可靠：進巢穴的載入畫面讀不到時鐘，停住判定中斷重算 → Glast Heim 巢穴勝利後沒進入找出口）
+        if (frozen && t - lastWindowAt > LAIR_NO_WINDOW_MS) {
           mvpFight = true;
           portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
           lastExit = null;
