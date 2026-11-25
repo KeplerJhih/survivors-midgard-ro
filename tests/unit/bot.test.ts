@@ -797,3 +797,39 @@ describe('時鐘還在走時看到的「視窗」是誤判', () => {
     expect(taps.length).toBeGreaterThan(0);
   });
 });
+
+describe('巢穴內（時間停住）', () => {
+  it('首領血條 20 秒不下降仍算首領戰（風箏）；低血量時撤退優先', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let fill = 20;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => 0.003, // 血條不動
+        readHp: () => ({ fill, low: false }),
+        approachSwirl: () => ['right'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(25000);
+    expect(bot.state.boss).toBe(true);
+    expect(bot.state.activity).toBe('kite');
+    fill = 4;
+    run(2000);
+    expect(bot.state.activity).toBe('retreat');
+  });
+});

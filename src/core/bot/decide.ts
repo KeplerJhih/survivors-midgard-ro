@@ -45,7 +45,8 @@ export interface Decision {
 export function decide(p: Perception, pat: Patterns): Decision {
   let activity: Activity;
   let want: Dir[];
-  const entering = !!p.frozen && !p.boss;
+  // 低血量時撤退優先（實機：巢穴內 HP 0.25 仍在找入口光、衝進首領攻擊範圍）
+  const entering = !!p.frozen && !p.boss && !p.lowHp;
   if (p.portal) {
     activity = 'portal';
     want = p.portal;

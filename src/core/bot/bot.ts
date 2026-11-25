@@ -225,7 +225,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
         const b = bossTracker.update(config.bossKite && deps.bossBar ? deps.bossBar() : 0, now());
         // 血條很久沒下降＝沒打到（首領在畫面外）→ 不風箏，照一般走位 / 追指示器去找它
-        const nowBoss = b.boss && !b.stalled;
+        // 巢穴內（時間停住）首領一定在場：血條久不下降也是首領戰（實機：Valkyrie Reginleif 血厚，
+        // 15 秒沒掉被當成「首領在畫面外」→ 不風箏、去找入口光，HP 見底）
+        const nowBoss = b.boss && (!b.stalled || state.frozen);
         if (nowBoss && !boss) log?.info('boss: 首領戰，改大圈風箏');
         if (b.stalled && boss) log?.info('boss: 血條沒下降，改一般走位去找首領');
         lowHp = nowLow;
