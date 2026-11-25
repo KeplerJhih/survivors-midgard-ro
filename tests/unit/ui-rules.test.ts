@@ -343,3 +343,28 @@ describe('decideByLayout（結構判斷）', () => {
     expect(decide(f)).toBeNull();
   });
 });
+
+describe('寬畫面（1568×713）結算頁', () => {
+  it('面板只佔 0.71 寬（UI 依高度縮放）仍認得出結算、點再玩一次', () => {
+    const WW = 704, HH = 320;
+    const data = new Uint8ClampedArray(WW * HH * 4);
+    for (let i = 0; i < WW * HH; i++) data.set([...GRASS, 255], i * 4);
+    const box = (x0: number, y0: number, x1: number, y1: number, fill: RGB) => {
+      const X0 = Math.round(x0 * WW), X1 = Math.round(x1 * WW), Y0 = Math.round(y0 * HH), Y1 = Math.round(y1 * HH);
+      for (let y = Y0; y < Y1; y++)
+        for (let x = X0; x < X1; x++) {
+          const edge = x <= X0 + 1 || x >= X1 - 2 || y <= Y0 + 1 || y >= Y1 - 2;
+          data.set([...(edge ? [150, 155, 170] : fill), 255], (y * WW + x) * 4);
+        }
+    };
+    box(0.145, 0.12, 0.855, 0.88, PANEL);
+    box(0.36, 0.8, 0.42, 0.85, BTN);
+    box(0.43, 0.8, 0.49, 0.85, BTN);
+    box(0.5, 0.8, 0.58, 0.85, BTN);
+    box(0.59, 0.8, 0.65, 0.85, BTN);
+    const f = { width: WW, height: HH, data };
+    const a = decideByLayout(f, parseLayout(f))!;
+    expect(a.kind).toBe('result');
+    expect(a.x).toBeCloseTo(0.46, 1);
+  });
+});

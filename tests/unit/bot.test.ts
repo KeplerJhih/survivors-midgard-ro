@@ -349,6 +349,7 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
         now: () => t,
         detectScreen: () => null,
         pointer: { tap: async () => {} },
+        readHp: () => ({ fill: 20, low: false }),
         clockGlyph: () => {
           if (clockRuns && !frozenGame) digit++;
           return glyph();
@@ -530,6 +531,7 @@ describe('辨識不到的視窗（畫面還在動）', () => {
         now: () => t,
         detectScreen: () => null,
         pointer: { tap: async () => {} },
+        readHp: () => ({ fill: 20, low: false }),
         clockGlyph: () => {
           if (clockRuns) digit++;
           return glyph();
@@ -604,5 +606,38 @@ describe('MVP 勝利後出口在畫面外', () => {
     run(40000);
     expect(bot.state.activity).toBe('enter');
     expect(bot.state.dirs).toEqual(['left']);
+  });
+});
+
+describe('結算頁蓋住 HUD 時不按 Enter', () => {
+  it('時鐘與角色同時停下，但 HP 條讀不到（結算頁）→ 不按 Enter（預設焦點是選擇目的地）', () => {
+    let t = 0;
+    let digit = 0;
+    let stopped = false;
+    let p = { x: 50, y: 50 };
+    const sent: string[] = [];
+    const target = new EventTarget();
+    target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
+    const keyboard = createKeyboard(target, { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => null,
+        pointer: { tap: async () => {} },
+        readHp: () => (stopped ? null : { fill: 20, low: false }),
+        clockGlyph: () => {
+          if (!stopped) digit++;
+          return glyph();
+        },
+        readMinimap: () => ({ player: { ...p }, boss: null }),
+      },
+    );
+    for (; t < 5000; t += 250) bot.tick(), (p = { x: p.x + 1, y: p.y });
+    stopped = true;
+    for (; t < 15000; t += 250) bot.tick();
+    expect(sent).not.toContain('Enter');
   });
 });

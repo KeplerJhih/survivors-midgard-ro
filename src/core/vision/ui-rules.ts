@@ -68,6 +68,11 @@ export function decideByLayout(
   rarity: RarityRank = defaultRarity,
   opts: LayoutOptions = {},
 ): ScreenAction | null {
+  // 結算頁大面板：遊戲 UI 依畫面高度縮放 → 以「寬 / 高」判斷，與視窗比例無關。
+  // 實機：16:9 時面板寬 0.92W（=1.64H），1568×713 寬畫面只有 0.71W（=1.56H）→ 原本「≥ 0.8W」認不出來，
+  // Enter 備援按到預設焦點「選擇目的地」而換地圖。暫停選單約 0.93H → 門檻 1.2H 分得開
+  const aspect = f.width / f.height;
+  const isWide = (r: Region) => rw(r) * aspect >= 1.2;
   const buttons = regions.filter((r) => r.kind === 'button');
   const panels = regions.filter((r) => r.kind === 'panel');
   const cards = regions.filter((r) => r.kind === 'card');
@@ -132,17 +137,18 @@ export function decideByLayout(
   // 必須在畫面底部（城鎮左上 [選單][角色][頻道][衣櫃] 也是 4 顆一排）
   if (bottom && (bottom.length === 4 || bottom.length === 3) && cy(bottom[0]!) >= 0.75) {
     const p = container(bottom);
-    if (p && rw(p) >= 0.8) return tap('result', bottom[bottom.length === 4 ? 1 : 0]!);
+    if (p && isWide(p)) return tap('result', bottom[bottom.length === 4 ? 1 : 0]!);
   }
   // 結算頁（全螢幕面板、最下排在畫面底部）：按鈕邊框淡，切出幾顆不一定（實機：有時頭尾兩顆、有時中間兩顆被當成
   // 一般對話框點了「前往 Prontera」進城鎮）→ 直接沿按鈕底邊掃圓角記號切出每顆按鈕
-  if (regions.some((r) => rw(r) >= 0.8 && rh(r) >= 0.85)) {
+  const resultBox = regions.find((r) => isWide(r) && rh(r) >= 0.7 && Math.abs(cx(r) - 0.5) < 0.06);
+  if (resultBox) {
     // 有切出底排（在畫面底部）就沿它的底邊掃；否則掃畫面底部 88~99%
     // （實機：一顆都切不出來 → 點成一般視窗進城鎮；開了「傷害詳情」小視窗時最下排變成上方的統計格）
     const atBottom = bottom && cy(bottom[0]!) >= 0.85;
     const hit = atBottom
       ? resultSlots(f, Math.max(...bottom.map((r) => r.y1)), Math.max(2, Math.round(0.012 * f.height)))
-      : resultSlots(f, 0.99, Math.round(0.11 * f.height));
+      : resultSlots(f, Math.min(0.99, resultBox.y1), Math.round(0.12 * f.height));
     if (hit && hit.slots.length === 4) return { kind: 'result', x: hit.slots[1]!, y: hit.y };
     if (hit && hit.slots.length === 3) return { kind: 'result', x: hit.slots[0]!, y: hit.y };
   }
@@ -152,13 +158,13 @@ export function decideByLayout(
     const p = container(bottom);
     const [a, b] = bottom as [Region, Region];
     const gap = b.x0 - a.x1;
-    if (p && rw(p) >= 0.8 && gap > 1.5 * ((rw(a) + rw(b)) / 2))
+    if (p && isWide(p) && gap > 1.5 * ((rw(a) + rw(b)) / 2))
       return { kind: 'result', x: a.x1 + gap * 0.25, y: cy(a) };
   }
   if (bottom && bottom.length === 2) {
     // 不限置中：任務 NPC 視窗在左側（[先不要][我來幫忙！]）
     const p = container(bottom);
-    if (p && rw(p) < 0.8) return tap('dialog', bottom[1]!);
+    if (p && !isWide(p)) return tap('dialog', bottom[1]!);
   }
   // 小面板內上下疊兩顆等寬的寬按鈕（MVP 勝利「繼續無盡模式／結束本局」）→ 點上面那顆（遊戲預設焦點、主要選項）
   const stacked = stackedPair(regions, buttons) ?? mergedStack(regions);
@@ -191,7 +197,7 @@ export function decideByLayout(
   if (bottom) {
     const p = container(bottom);
     const byWidth = [...bottom].sort((a, b) => rw(b) - rw(a));
-    if ((!p || rw(p) < 0.8) && rw(byWidth[0]!) >= 1.4 * rw(byWidth[1]!)) return tap('map-select', byWidth[0]!);
+    if ((!p || !isWide(p)) && rw(byWidth[0]!) >= 1.4 * rw(byWidth[1]!)) return tap('map-select', byWidth[0]!);
   }
   // 大區塊右下角獨自一排的按鈕（選地圖「選擇 ▶」：返回/狂熱太小切不出來，只剩它）
   const corner = cornerButton(regions, buttons);

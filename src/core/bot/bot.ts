@@ -350,7 +350,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         state.dirs.length > 0 &&
         t - mmChangedAt >= STILL_MS &&
         Math.abs(clock.changedAt - mmChangedAt) < STILL_CLOCK_GAP;
-      if (!seen && !deps.gameSync?.busy && (stillPause || heldStill) && t - lastEnter >= ENTER_COOLDOWN) {
+      // 左上 HP 條還讀得到才按：任務完成 / 轉職 / 馴服等視窗不蓋 HUD；結算頁整個蓋掉 HUD，
+      // 預設焦點是「選擇目的地」（實機：結算頁沒認出來 → Enter → 換到別張地圖）
+      const hudVisible = now() - hpSeenAt < 2000;
+      if (!seen && !deps.gameSync?.busy && hudVisible && (stillPause || heldStill) && t - lastEnter >= ENTER_COOLDOWN) {
         lastEnter = t;
         state.screenTaps++;
         state.lastScreen = 'still-enter';
