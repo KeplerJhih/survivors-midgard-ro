@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALTAR_COLORS, findAltars } from '@/core/vision/minimap';
+import { ALTAR_COLORS, findAltars, findRunner } from '@/core/vision/minimap';
 
 const W = 400;
 const H = 400;
@@ -68,5 +68,32 @@ describe('findAltars（小地圖祭壇標記）', () => {
       for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) set(200 + x, 200 + y, ALTAR_COLORS.emperium);
     });
     expect(findAltars(f, SQ)).toEqual([]);
+  });
+});
+
+describe('findRunner（小地圖金波利）', () => {
+  const blob = (set: (x: number, y: number, c: [number, number, number]) => void, cx: number, cy: number, c: [number, number, number]) => {
+    for (let y = -10; y <= 10; y++) for (let x = -10; x <= 10; x++) if (x * x + y * y <= 100) set(cx + x, cy + y, c);
+  };
+  it('金黃色實心圓（中間沒有符號）→ 金波利', () => {
+    const f = frame((set) => blob(set, 200, 120, [255, 209, 64]));
+    const r = findRunner(f, SQ)!;
+    expect(r.x).toBeCloseTo(200, -1);
+  });
+  it('同色但中間有深色「!」→ 任務 NPC，不是金波利', () => {
+    const f = frame((set) => {
+      blob(set, 200, 120, [255, 209, 77]);
+      for (let y = 114; y <= 124; y++) for (let x = 199; x <= 201; x++) set(x, y, [64, 38, 0]);
+    });
+    expect(findRunner(f, SQ)).toBeNull();
+  });
+});
+
+describe('findRunner：寶箱方塊不算', () => {
+  it('同色系實心方塊（小地圖寶箱）→ 不是金波利', () => {
+    const f = frame((set) => {
+      for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) set(200 + x, 120 + y, [255, 217, 51]);
+    });
+    expect(findRunner(f, SQ)).toBeNull();
   });
 });

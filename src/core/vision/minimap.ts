@@ -20,6 +20,8 @@ export interface MinimapRead {
   boss: Point | null;
   /** 小地圖上的祭壇標記（已排除催眠師） */
   altars?: AltarMark[];
+  /** 金波利（Golden Poring，限時 40 秒、會跑；抓到有大量 zeny 與金幣） */
+  runner?: Point | null;
 }
 
 /**
@@ -268,6 +270,69 @@ function squareOrLast(f: Frame): Square | null {
   return lastSquare && lastSquare.w === f.width && lastSquare.h === f.height ? lastSquare.sq : null;
 }
 
+/**
+ * 金波利（ui/ro_minimap.gd：RUNNER 色 (1.0,0.82,0.25) 實心圓 r4.5 ＋白色閃爍外環＋棕色描邊）。
+ * 任務 NPC 標記幾乎同色（QUEST_COLOR (1.0,0.82,0.3)），但圓中間畫了深色「!」→ 以圓內有無深色像素區分（不只靠顏色）。
+ */
+const RUNNER_RGB: [number, number, number] = [255, 209, 64];
+export function findRunner(f: Frame, sq: Square): Point | null {
+  const { width: W, data } = f;
+  const side = sq.x1 - sq.x0;
+  const x0 = Math.max(0, Math.floor(sq.x0)), x1 = Math.min(W, Math.ceil(sq.x1));
+  const y0 = Math.max(0, Math.floor(sq.y0)), y1 = Math.min(f.height, Math.ceil(sq.y1));
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 0 || h <= 0) return null;
+  const at = (x: number, y: number) => ((y0 + y) * W + x0 + x) * 4;
+  const ok = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const i = at(x, y);
+      if (Math.hypot(data[i]! - RUNNER_RGB[0], data[i + 1]! - RUNNER_RGB[1], data[i + 2]! - RUNNER_RGB[2]) < 45) ok[y * w + x] = 1;
+    }
+  const seen = new Uint8Array(w * h);
+  let best: (Point & { n: number }) | null = null;
+  const minD = 0.04 * side, maxD = 0.11 * side;
+  for (let s = 0; s < w * h; s++) {
+    if (!ok[s] || seen[s]) continue;
+    seen[s] = 1;
+    const stack = [s];
+    let n = 0, sx = 0, sy = 0, mnx = w, mxx = 0, mny = h, mxy = 0;
+    while (stack.length) {
+      const p = stack.pop()!;
+      const x = p % w, y = (p / w) | 0;
+      n++;
+      sx += x;
+      sy += y;
+      if (x < mnx) mnx = x;
+      if (x > mxx) mxx = x;
+      if (y < mny) mny = y;
+      if (y > mxy) mxy = y;
+      for (const q of [p - 1, p + 1, p - w, p + w]) {
+        if (q < 0 || q >= w * h || seen[q] || !ok[q]) continue;
+        if (Math.abs((q % w) - x) > 1) continue;
+        seen[q] = 1;
+        stack.push(q);
+      }
+    }
+    const bw = mxx - mnx + 1, bh = mxy - mny + 1;
+    if (bw < minD || bh < minD || bw > maxD || bh > maxD || bw / bh < 0.7 || bw / bh > 1.4) continue;
+    // 寶箱是同色系的方塊（CHEST_DOT 6×6）：填滿率近 1；圓約 0.785
+    if (n / (bw * bh) > 0.9) continue;
+    // 圓內（中心 60% 範圍）有深色像素＝任務的「!」→ 不是金波利
+    let dark = 0, tot = 0;
+    const cx = (mnx + mxx) / 2, cy = (mny + mxy) / 2, r = 0.3 * Math.min(bw, bh);
+    for (let y = Math.round(cy - r); y <= Math.round(cy + r); y++)
+      for (let x = Math.round(cx - r); x <= Math.round(cx + r); x++) {
+        tot++;
+        const i = at(x, y);
+        if (0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]! < 110) dark++;
+      }
+    if (dark > tot * 0.08) continue;
+    if (!best || n > best.n) best = { x: x0 + sx / n, y: y0 + sy / n, n };
+  }
+  return best ? { x: best.x, y: best.y } : null;
+}
+
 export function readMinimap(f: Frame): MinimapRead | null {
   const area = f.width * f.height;
   const arrow = blobs(f, isArrow)
@@ -284,6 +349,7 @@ export function readMinimap(f: Frame): MinimapRead | null {
     player: { x: arrow.x, y: arrow.y },
     boss: boss ? { x: boss.x, y: boss.y } : null,
     altars: sq ? findAltars(f, sq) : [],
+    runner: sq ? findRunner(f, sq) : null,
   };
 }
 

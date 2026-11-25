@@ -42,6 +42,8 @@ export interface BotState {
   picks: number;
   /** 小地圖上看到的祭壇（除錯用） */
   altars: string[];
+  /** 小地圖上看到金波利（除錯用） */
+  runner: boolean;
 }
 
 export interface Bot {
@@ -225,6 +227,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     ticks: 0,
     picks: 0,
     altars: [],
+    runner: false,
   };
 
   // ---- 感知（節流）----
@@ -286,6 +289,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         mmSeenAt = now();
         mmLast = m;
         state.altars = (m.altars ?? []).map((a) => a.id);
+        state.runner = !!m.runner;
         if (!mmPos || Math.hypot(m.player.x - mmPos.x, m.player.y - mmPos.y) > MINIMAP_MOVE_PX) {
           mmPos = m.player;
           mmMovedAt = now();
@@ -363,6 +367,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       return null;
     }
     return d;
+  };
+
+  /** 金波利：依小地圖追（會跑、限時 40 秒；在畫面內時沒有邊緣指示器可追） */
+  const chaseRunner = (): Dir[] | null => {
+    if (!config.seekTargets || !mmLast?.runner || now() - mmSeenAt > 1500) return null;
+    return navigator.steer(mmLast.player, mmLast.runner, 1.5);
   };
 
   /** 入口在畫面外又沒有指示器（暗色地圖指示圓盤與地形連成一片）→ 依小地圖走回入口剛開時的位置，入口就會回到畫面上 */
@@ -561,7 +571,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const bossSeek = sense.bossSeek.get(t);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
       const altar = busy || bossSeek ? null : seekAltar(t);
-      const target = busy ? null : bossSeek ?? altar ?? sense.target.get(t);
+      const runner = busy || bossSeek ? null : chaseRunner();
+      const target = busy ? null : bossSeek ?? runner ?? altar ?? sense.target.get(t);
       const object = busy || target ? null : (lootStep(t) ?? sense.object.get(t));
       const elapsed = t - startedAt;
       const { activity, want: decided } = decide(
