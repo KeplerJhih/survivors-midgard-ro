@@ -44,6 +44,8 @@ export interface BotState {
   altars: string[];
   /** 小地圖上看到金波利（除錯用） */
   runner: boolean;
+  /** 入口開著時走向的來源（除錯用） */
+  enterSrc: string;
 }
 
 export interface Bot {
@@ -228,6 +230,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     picks: 0,
     altars: [],
     runner: false,
+    enterSrc: '-',
   };
 
   // ---- 感知（節流）----
@@ -376,6 +379,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   };
 
   /** 入口在畫面外又沒有指示器（暗色地圖指示圓盤與地形連成一片）→ 依小地圖走回入口剛開時的位置，入口就會回到畫面上 */
+  /** 入口開著時的走向（記錄來源供除錯：指示器 / 畫面光 / 小地圖回入口位置） */
+  const entryApproach = (t: number): Dir[] | null => {
+    const p = sense.pointer.get(t);
+    if (p) return (state.enterSrc = 'pointer'), p;
+    const g = sense.approach.get(t);
+    if (g) return (state.enterSrc = 'glow'), g;
+    const h = backToPortalHome();
+    state.enterSrc = h ? 'home' : '-';
+    return h;
+  };
+
   const backToPortalHome = (): Dir[] | null => {
     if (!portalHome || !mmLast) return null;
     return navigator.steer(mmLast.player, portalHome, 4);
@@ -589,7 +603,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           approach: exitSeek
             ? exitApproach(t)
             : frozen && !vitals.boss
-              ? (sense.pointer.get(t) ?? sense.approach.get(t) ?? backToPortalHome())
+              ? entryApproach(t)
               : null,
           flee: frozen || exitSeek ? null : sense.swirl.get(t),
           danger: sense.danger.get(t),
