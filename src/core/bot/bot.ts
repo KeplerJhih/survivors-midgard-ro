@@ -261,9 +261,13 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (act.kind === 'dialog' || act.kind === 'result' || act.kind === 'start-skill') mvpFight = false;
         state.lastScreen = act.kind;
         // 點了幾次視窗還在（畫面大小不同時按鈕位置可能算偏）→ 與點擊交替按 Enter（預設焦點按鈕）。
-        // 腐化寶箱（預設焦點 Hel）、結算頁（焦點不一定是再玩一次）不按
+        // 腐化寶箱（預設焦點 Hel）、結算頁（焦點不一定是再玩一次）、轉職選右邊（預設焦點是左邊）不按
         const enter =
-          windowTaps >= TAPS_BEFORE_ENTER && windowTaps % 2 === 1 && act.kind !== 'corrupt' && act.kind !== 'result';
+          windowTaps >= TAPS_BEFORE_ENTER &&
+          windowTaps % 2 === 1 &&
+          act.kind !== 'corrupt' &&
+          act.kind !== 'result' &&
+          !(act.kind === 'job' && config.jobPath === 'second');
         windowTaps++;
         if (enter) {
           log?.info('screen: 點擊無效，改按 Enter', act);

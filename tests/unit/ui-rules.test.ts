@@ -40,6 +40,33 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeCloseTo(0.705, 1);
   });
 
+  describe('轉職：大面板內左右兩張職業卡', () => {
+    // 實機：只切出有預設焦點藍框的左卡，右卡外框淡、和面板連成一塊
+    const f = draw(GRASS, [
+      { x0: 0.24, y0: 0.08, x1: 0.76, y1: 0.92, fill: PANEL },
+      { x0: 0.25, y0: 0.21, x1: 0.49, y1: 0.86, fill: PANEL, border: [84, 140, 242] },
+    ]);
+    it('預設（左）→ 點左卡', () => {
+      const a = decideByLayout(f, parseLayout(f))!;
+      expect(a.kind).toBe('job');
+      expect(a.x).toBeCloseTo(0.37, 1);
+    });
+    it('設定右邊 → 點面板內的鏡像位置（右卡）', () => {
+      const a = decideByLayout(f, parseLayout(f), undefined, { jobPath: 'second' })!;
+      expect(a.kind).toBe('job');
+      expect(a.x).toBeCloseTo(0.63, 1);
+    });
+    it('兩張都切得出來 → 依設定點對應的那張', () => {
+      const g = draw(GRASS, [
+        { x0: 0.24, y0: 0.08, x1: 0.76, y1: 0.92, fill: PANEL },
+        { x0: 0.25, y0: 0.21, x1: 0.49, y1: 0.86, fill: PANEL, border: [84, 140, 242] },
+        { x0: 0.51, y0: 0.21, x1: 0.75, y1: 0.86, fill: PANEL, border: [150, 155, 170] },
+      ]);
+      expect(decideByLayout(g, parseLayout(g), undefined, { jobPath: 'second' })!.x).toBeCloseTo(0.63, 1);
+      expect(decideByLayout(g, parseLayout(g))!.x).toBeCloseTo(0.37, 1);
+    });
+  });
+
   it('腐化寶箱：兩張卡各有按鈕 → 點右卡的按鈕', () => {
     const f = draw(GRASS, [
       { x0: 0.1, y0: 0.12, x1: 0.9, y1: 0.9, fill: PANEL },

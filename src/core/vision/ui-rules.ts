@@ -57,7 +57,17 @@ function borderColor(f: Frame, r: Region): [number, number, number] {
 
 const tap = (kind: ScreenAction['kind'], r: Region): ScreenAction => ({ kind, x: cx(r), y: cy(r) });
 
-export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank = defaultRarity): ScreenAction | null {
+export interface LayoutOptions {
+  /** 轉職選哪條路（左＝第一條、右＝第二條）；只有一條路的職業不受影響 */
+  jobPath?: 'first' | 'second';
+}
+
+export function decideByLayout(
+  f: Frame,
+  regions: Region[],
+  rarity: RarityRank = defaultRarity,
+  opts: LayoutOptions = {},
+): ScreenAction | null {
   const buttons = regions.filter((r) => r.kind === 'button');
   const panels = regions.filter((r) => r.kind === 'panel');
   const cards = regions.filter((r) => r.kind === 'card');
@@ -72,6 +82,10 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     const btnB = buttons.find((x) => inside(x, b, 0.01));
     if (btnA && btnB) return tap('corrupt', btnB);
   }
+
+  // ---- 轉職（Base Lv 20）----
+  const job = jobChange(regions, opts.jobPath === 'second' ? 1 : 0);
+  if (job) return { kind: 'job', ...job };
 
   // ---- 卡片列 ----
   // 卡片列必須被一個大區塊包住（升級視窗）：MVP 戰的技能白光、左側 MVP 技能面板曾被誤判成卡片。
@@ -458,4 +472,36 @@ function dimmedDialog(f: Frame, regions: Region[]): Region | null {
     }
   }
   return n && cand.luma - sum / n >= 60 && bright / n < 0.02 ? cand : null;
+}
+
+/**
+ * 轉職視窗（ui/menus.gd show_job_change）：置中大面板內左右兩張直立職業卡，各佔面板約一半寬、從面板頂端附近一路到底；
+ * 整張卡就是按鈕。實機（3840×1858 取樣 640）：面板 0.24~0.76 × 0.08~0.92，只切出有預設焦點藍框的左卡 0.25~0.49 × 0.21~0.86，
+ * 右卡外框淡、和面板連成一塊 → 只看到一張時，另一條路取面板內的鏡像位置。
+ * 腐化寶箱也是兩張並排，但卡片在面板下半部（頂端離面板頂 ≥ 40%）→ 以「卡片從面板上方 25% 內開始、高 ≥ 面板 70%」區分。
+ * 只有一條路的職業（卡片置中）不處理，交給 Enter 備援（只有一個選項）。
+ */
+function jobChange(regions: Region[], path: 0 | 1): { x: number; y: number } | null {
+  const boxes = regions.filter((r) => rw(r) * rh(r) >= 0.25 && rh(r) >= 0.6 && Math.abs(cx(r) - 0.5) < 0.06);
+  for (const p of boxes) {
+    const cards = regions
+      .filter(
+        (c) =>
+          c !== p &&
+          c.kind === 'card' &&
+          inside(c, p, 0.01) &&
+          rw(c) / rw(p) >= 0.38 &&
+          rw(c) / rw(p) <= 0.5 &&
+          rh(c) >= 0.7 * rh(p) &&
+          c.y0 - p.y0 <= 0.25 * rh(p),
+      )
+      .sort((a, b) => cx(a) - cx(b));
+    if (cards.length === 2) return { x: cx(cards[path]!), y: cy(cards[path]!) };
+    if (cards.length !== 1) continue;
+    const c = cards[0]!;
+    const side = cx(c) < cx(p) - 0.05 * rw(p) ? 0 : cx(c) > cx(p) + 0.05 * rw(p) ? 1 : -1;
+    if (side < 0) continue;
+    return { x: side === path ? cx(c) : p.x0 + p.x1 - cx(c), y: cy(c) };
+  }
+  return null;
 }

@@ -55,6 +55,13 @@
       <div class="hint warn">辨識準確度不足，可能被誤判拉著亂走，預設關閉</div>
       <label><input type="checkbox" data-key="bot.autoContinue" /> 自動再玩一次</label>
       <div class="hint">畫面辨識：結算頁→再玩一次、確認框→仍要離開/繼續、初始技能→上次選擇</div>
+      <label>轉職路線（Base Lv 20）
+        <select data-key="bot.jobPath">
+          <option value="first">左邊（第一條）</option>
+          <option value="second">右邊（第二條）</option>
+        </select>
+      </label>
+      <div class="hint">例：Acolyte 左 Priest / 右 Monk、Swordsman 左 Knight / 右 Crusader、Mage 左 Wizard / 右 Sage；只有一條路的職業不受影響</div>
     </fieldset>
 
     <fieldset>
