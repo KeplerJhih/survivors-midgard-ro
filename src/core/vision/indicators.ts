@@ -191,3 +191,12 @@ export function createIndicatorSeeker(
     },
   };
 }
+
+/**
+ * 大紫圓盤只有在 MVP 入口開著（時間停住）時才是入口（Baphomet 等）；平常是催眠師（實機：大小 0.065、
+ * 色 (185,116,250)，被「大圓盤一律前往」帶過去，一局被催眠兩次）→ 時間沒停住時改回 avoid。
+ */
+export function resolvePurple(list: Indicator[], frozen: boolean): Indicator[] {
+  if (frozen) return list;
+  return list.map((i) => (i.kind === 'target' && classifyIcon(...i.icon) === 'avoid' ? { ...i, kind: 'avoid' as const } : i));
+}

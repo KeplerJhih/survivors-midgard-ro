@@ -6,7 +6,7 @@ import { circle, createStrategy, type Strategy } from '../movement/strategies';
 import type { BotConfig } from '../settings';
 import type { DangerProbes } from '../vision/danger';
 import { createBossTracker, createHpTracker, type HpReading } from '../vision/hud';
-import { createIndicatorSeeker, type Indicator } from '../vision/indicators';
+import { createIndicatorSeeker, resolvePurple, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
@@ -171,7 +171,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     ),
     target: throttle(
       INTERVAL.indicator,
-      () => (config.seekTargets && deps.findIndicators ? targetSeeker.update(deps.findIndicators(), now()) : null),
+      () => {
+        if (!config.seekTargets || !deps.findIndicators) return null;
+        const list = deps.findIndicators();
+        return targetSeeker.update(list && resolvePurple(list, state.frozen), now());
+      },
       null as Dir[] | null,
     ),
     object: throttle(

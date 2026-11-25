@@ -7,6 +7,7 @@ import {
   steerToIndicator,
   type Indicator,
 } from '@/core/vision/indicators';
+import { resolvePurple } from '@/core/vision/indicators';
 
 const W = 320;
 const H = 224;
@@ -122,5 +123,16 @@ describe('createIndicatorSeeker', () => {
     expect(s.update(list, 40000)).toBeNull(); // 冷卻中
     s.update(list, 52000);
     expect(s.update(list, 52400)).toEqual(['right']);
+  });
+});
+
+describe('resolvePurple', () => {
+  const big = { kind: 'target' as const, x: -0.35, y: 0.2, icon: [185, 116, 250] as [number, number, number], size: 0.065 };
+  const gold = { kind: 'target' as const, x: 0.3, y: 0, icon: [230, 170, 60] as [number, number, number], size: 0.065 };
+  it('時間沒停住：大紫圓盤（催眠師）改成避開，金色大圓盤不變', () => {
+    expect(resolvePurple([big, gold], false).map((i) => i.kind)).toEqual(['avoid', 'target']);
+  });
+  it('時間停住（MVP 入口開著）：大紫圓盤仍是目標', () => {
+    expect(resolvePurple([big], true)[0]!.kind).toBe('target');
   });
 });
