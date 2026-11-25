@@ -1012,3 +1012,42 @@ describe('一般走位撞牆', () => {
     expect(seen.some((d) => d.includes('up') || d.includes('down'))).toBe(true);
   });
 });
+
+describe('一般首領戰中被視窗短暫暫停', () => {
+  it('時鐘只停一下 → 不當成巢穴，首領打完不會去找出口', () => {
+    let t = 0;
+    let digit = 0;
+    let clockRuns = true;
+    let bar = 0.003;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (clockRuns) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => ['up'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) {
+        t += 250;
+        bar = Math.max(0, bar - 0.00002);
+        bot.tick();
+      }
+    };
+    run(5000);
+    clockRuns = false; // 視窗暫停
+    run(4000);
+    clockRuns = true;
+    run(3000);
+    bar = 0; // 首領被打倒
+    run(4000);
+    expect(bot.state.activity).not.toBe('enter');
+  });
+});
