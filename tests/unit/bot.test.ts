@@ -761,3 +761,39 @@ describe('巢穴勝利後點掉對話框', () => {
     expect(bot.state.activity).not.toBe('enter');
   });
 });
+
+describe('時鐘還在走時看到的「視窗」是誤判', () => {
+  it('時鐘在走 → 不停下不點；時鐘停下（真的視窗）→ 照常點', () => {
+    let t = 0;
+    let digit = 0;
+    let clockRuns = true;
+    let fake = false;
+    const taps: number[] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (clockRuns) digit++;
+          return glyph();
+        },
+        detectScreen: () => (fake ? { kind: 'modal', x: 0.5, y: 0.5 } : null),
+        pointer: { tap: async (x) => void taps.push(x) },
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(3000); // 時鐘開始走
+    fake = true;
+    run(8000);
+    expect(taps).toEqual([]);
+    expect(bot.state.activity).not.toBe('screen');
+    clockRuns = false;
+    run(6000);
+    expect(taps.length).toBeGreaterThan(0);
+  });
+});

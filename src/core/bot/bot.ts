@@ -89,6 +89,8 @@ const HP_RECOVER_MS = 3000;
 const STILL_MS = 4000;
 /** 畫面靜止時，時鐘須在這段時間內還在走，才算「視窗跳出讓遊戲暫停」 */
 const STILL_CLOCK_GAP = 4000;
+/** 時鐘在這段時間內還有走動＝遊戲進行中（沒有視窗暫停） */
+const GAME_RUNNING_MS = 2000;
 /** 走向傳送門時畫面靜止多久＝撞牆 → 往側邊繞 DETOUR_MS */
 const STUCK_MS = 1500;
 const DETOUR_MS = 2000;
@@ -345,7 +347,13 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
 
       // 視窗：辨識到就點擊並停止移動，等畫面切換
       // 同步遊戲設定中：暫停選單由同步模組操作，畫面辨識不插手（否則會被保險規則點「繼續」關掉）
-      const seen = deps.gameSync?.busy ? null : sense.screen.get(t);
+      // 時鐘還在走＝遊戲沒被視窗暫停 → 看到的「視窗」是誤判，不停下也不點
+      // （實機：Pyramid 亮色石地被當成視窗，角色停在沒勾選的 Valkyrie 祭壇圈內，差點觸發）。
+      // 真的視窗會讓時鐘停下，最多晚 2 秒照常處理。視窗期間也持續讀時鐘，判斷才不會過期
+      sense.frozen.get(t);
+      const gameRunning = clock.ticking && t - clock.changedAt < GAME_RUNNING_MS;
+      const rawSeen = deps.gameSync?.busy ? null : sense.screen.get(t);
+      const seen = gameRunning ? null : rawSeen;
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       if (act && pointer) {
