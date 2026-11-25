@@ -28,6 +28,15 @@ describe('createFreezeDetector', () => {
     expect(d.update(glyph(50), t + 3000)).toBe(true);
   });
 
+  it('停住期間時鐘一角被蓋住好幾秒（出現、消失各變一次）不算走動', () => {
+    const d = createFreezeDetector(3000);
+    let t = 0;
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(s), t);
+    for (let i = 0; i < 5; i++, t += 1000) d.update(glyph(50), t);
+    for (let i = 0; i < 5; i++, t += 1000) expect(d.update(glyph(60), t)).toBe(true);
+    for (let i = 0; i < 3; i++, t += 1000) expect(d.update(glyph(50), t)).toBe(true);
+  });
+
   it('沒看過走動（開局就停住）、讀不到時鐘都不判定', () => {
     const d = createFreezeDetector(3000);
     for (let s = 0; s < 8; s++) expect(d.update(glyph(0), s * 1000)).toBe(false);

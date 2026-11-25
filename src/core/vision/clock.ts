@@ -39,7 +39,8 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
   let nowT = 0;
   let state = false;
   let seenAt = -Infinity;
-  let pending = false;
+  let prev2: Uint8Array | null = null;
+  let lastChanged = false;
   return {
     get ticking() {
       return ticked && nowT - changedAt < 10000;
@@ -61,25 +62,24 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
         return d > Math.max(3, Math.max(on, lastOn) * 0.02);
       };
       if (last && last.length === glyph.length) {
-        // 變化要「下一筆沒有變回原樣」才算走動：實機巢穴內傷害數字 / 閃光飄過時鐘一瞬間（差異 146 px）
-        // 被當成走動 → 「停住」中斷 3 秒。時鐘真的在走時下一筆仍和舊字形不同 → 只晚一筆確認
-        if (pending) {
-          if (diff(last)) {
-            changedAt = now;
-            ticked = true;
-            last = glyph;
-          }
-          pending = false;
-        } else if (diff(last)) {
-          pending = true;
+        // 連續兩筆都在變、且不是變回前前一筆，才算走動（時鐘在走時每筆都是新的秒數）。
+        // 實機巢穴內：傷害數字閃過時鐘一筆就變回原樣（差異 146 px）；首領圖示 / 特效蓋住一角好幾秒
+        // （差異 48 px，出現、消失各變一次）→ 都只是單次變化，原本被當成走動 → 「停住」中斷 3 秒
+        const changed = diff(last) && !(prev2 && prev2.length === glyph.length && !diff(prev2));
+        if (changed && lastChanged) {
+          changedAt = now;
+          ticked = true;
         }
+        lastChanged = changed;
+        prev2 = last;
       } else {
         // 第一次：開始計時；長度不同（方框由上下邊找到 / 由單邊推算，寬差幾 px）：只換參考字形，不重新計時
         // （實機：入口開著時兩種方式交替 → 每次都重置 → 「停住」閃動）
         if (!last) changedAt = now;
-        last = glyph;
-        pending = false;
+        prev2 = null;
+        lastChanged = false;
       }
+      last = glyph;
       lastOn = on;
       return (state = ticked && now - changedAt >= freezeMs);
     },
