@@ -112,14 +112,16 @@ export function keepTiles(regions: Region[], aspect: number): { x: number; y: nu
     if (g) g.push(r);
     else groups.push([r]);
   }
-  const row = groups.filter((g) => g.length >= 4).sort((a, b) => b.length - a.length)[0];
+  // 只在已認出結算頁時才呼叫 → 1 格也算（實機：只有 3 件可帶，原本要求 ≥ 4 格 → 一件都沒帶）
+  const row = groups.sort((a, b) => b.length - a.length)[0];
   if (!row) return [];
   const ws = row.map(rw).sort((a, b) => a - b);
   const medW = ws[ws.length >> 1]!;
   const tops = row.map((r) => r.y0).sort((a, b) => a - b);
   const medTop = tops[tops.length >> 1]!;
   return row
-    .filter((r) => Math.abs(rw(r) - medW) <= medW * 0.35 && r.y0 >= medTop - 0.012)
+    // 「x1」標籤讓頂端高出約 0.031；被上方篩選鈕黏住只高 0.017（實機）→ 門檻 0.02
+    .filter((r) => Math.abs(rw(r) - medW) <= medW * 0.35 && r.y0 >= medTop - 0.02)
     .sort((a, b) => a.x0 - b.x0)
     .map((r) => ({ x: cx(r), y: cy(r) }));
 }
@@ -354,8 +356,11 @@ function resultSlots(f: Frame, bottomY: number, rows: number): { slots: number[]
     if (groups.length < 4 || groups.length > 5) continue;
     const centers = groups.map((g) => (g[0]! + g[g.length - 1]!) / 2 / W);
     const slots = centers.slice(1).map((c, k) => (centers[k]! + c) / 2);
-    // 每顆寬 3~15%、整排置中（± 8%）
-    if (!slots.every((_, k) => centers[k + 1]! - centers[k]! >= 0.03 && centers[k + 1]! - centers[k]! <= 0.15)) continue;
+    // 每顆寬 3~15%、整排置中（± 8%）。例外：完整 4 顆（5 條邊界）時第一顆「選擇目的地」可到 25%
+    // （實機：「選擇目的地 · Glast Heim 已解鎖！」寬 0.155 → 認不出、卡在結算頁）。
+    // 不完整時維持嚴格：無盡模式中間兩顆切不出來時，放寬會把頭尾配錯而點到「選擇目的地」
+    const maxW = (k: number) => (k === 0 && groups.length === 5 ? 0.25 : 0.15);
+    if (!slots.every((_, k) => centers[k + 1]! - centers[k]! >= 0.03 && centers[k + 1]! - centers[k]! <= maxW(k))) continue;
     if (Math.abs((centers[0]! + centers[centers.length - 1]!) / 2 - 0.5) > 0.08) continue;
     if (!best || slots.length > best.slots.length) best = { slots, y: (y - 0.02 * H) / H };
   }
