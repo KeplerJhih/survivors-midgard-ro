@@ -236,6 +236,17 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeCloseTo(0.345, 1);
   });
 
+  it('寶箱視窗：寬的獎勵列像按鈕、下方小「繼續」→ 點繼續不點獎勵列', () => {
+    const f = draw(GRASS, [
+      { x0: 0.263, y0: 0.216, x1: 0.738, y1: 0.782, fill: PANEL },
+      { x0: 0.3, y0: 0.531, x1: 0.7, y1: 0.595, fill: BTN, border: [120, 200, 120] },
+      { x0: 0.484, y0: 0.72, x1: 0.516, y1: 0.765, fill: BTN, border: [90, 110, 200] },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.y).toBeGreaterThan(0.7);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },

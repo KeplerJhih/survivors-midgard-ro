@@ -129,6 +129,7 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   if (dlg) return { kind: 'dialog', x: dlg.x0 + 0.9 * rw(dlg), y: dlg.y0 + 0.8 * rh(dlg) };
 
   // 置中單一寬按鈕（獨自一排）
+  const frag = bottomFragment(regions);
   const wide = buttonRows
     .filter((g) => g.length === 1)
     .map((g) => g[0]!)
@@ -141,6 +142,9 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     // 下方還有「獨自一排」的按鈕時，那顆才是動作按鈕（實機：任務完成視窗把寬的獎勵列當成按鈕一直點，
     // 真正的「繼續」是右下小按鈕）；暫停選單「繼續」下方是 4 顆一排的選單，不受影響
     .filter((b) => !buttonRows.some((g) => g.length === 1 && g[0] !== b && cy(g[0]!) > cy(b) + 0.03 && cy(g[0]!) - cy(b) < 0.3))
+    // 寶箱視窗：獎勵列（寬、像按鈕）下方沒有按鈕、只有被文字切碎的小「繼續」→ 不點獎勵列（實機：一直點「Mace」列卡住）；
+    // 暫停選單「繼續」下方有一排按鈕，不受影響
+    .filter((b) => !(frag && cy(frag) > cy(b) + 0.03 && !buttons.some((x) => x !== b && cy(x) > cy(b) + 0.03)))
     .sort((a, b) => cy(b) - cy(a))[0];
   if (wide) return tap('modal', wide);
   // 最下排明顯最寬的按鈕（準備「出發冒險！」等）；全寬面板（結算頁）不適用
@@ -159,7 +163,6 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   const tile = tileGrid(regions);
   if (tile) return tap('modal', tile);
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
-  const frag = bottomFragment(regions);
   if (frag) return tap('modal', frag);
   return null;
 }
