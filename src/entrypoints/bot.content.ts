@@ -16,7 +16,7 @@ import { detectScreen } from '@/core/vision/screens';
 import { parseLayout } from '@/core/vision/layout';
 import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
-import { approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
+import { approachExit, approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { clockGlyph } from '@/core/vision/clock';
 import { bossBar, readHp } from '@/core/vision/hud';
 import { findMinimapSquare, MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
@@ -98,6 +98,10 @@ export default defineContentScript({
       approachSwirl: () => {
         const frame = sample();
         return frame ? approachSwirl(frame) : null;
+      },
+      approachExit: () => {
+        const frame = sample();
+        return frame ? approachExit(frame) : null;
       },
       fleeSwirl: () => {
         const frame = sample();

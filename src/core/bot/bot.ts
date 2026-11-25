@@ -62,6 +62,8 @@ export interface BotDeps {
   clockGlyph?: () => Uint8Array | null;
   /** 走向粉紫光圈的方向 */
   approachSwirl?: () => Dir[] | null;
+  /** MVP 勝利後走向淡藍出口 */
+  approachExit?: () => Dir[] | null;
   /** 遊戲內設定同步（暫停選單勾選框）；需要時 bot 會暫停其他行為 */
   gameSync?: GameSync;
   pointer?: Pointer;
@@ -94,6 +96,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let lowHp = false;
   let boss = false;
   let screenStreak = 0;
+  let mvpDone = false;
+  let calmSince: number | null = null;
 
   const portalSeeker = createPortalSeeker();
   const targetSeeker = createIndicatorSeeker();
@@ -177,6 +181,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     ),
     frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? clock.update(deps.clockGlyph(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
+    exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
   };
@@ -236,6 +241,13 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const portal = sense.portal.get(t);
       const frozen = sense.frozen.get(t);
       state.frozen = frozen;
+      // 時間停住期間打過首領＝在 MVP 巢穴裡（入口開著時一般怪物會被清掉，不會有首領）→ 勝利後找淡藍出口；
+      // 時間恢復且沒首領超過 10 秒才清除（停住判定偶爾閃動）
+      if (frozen && vitals.boss) mvpDone = true;
+      if (!frozen && !vitals.boss) {
+        if (calmSince === null) calmSince = t;
+        else if (t - calmSince > 10000) mvpDone = false;
+      } else calmSince = null;
       const busy = portal || vitals.lowHp || vitals.boss || frozen;
       const bossSeek = sense.bossSeek.get(t);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
@@ -248,7 +260,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           target,
           object,
           frozen,
-          approach: frozen && !vitals.boss ? sense.approach.get(t) : null,
+          approach: frozen && !vitals.boss ? (mvpDone ? sense.exit.get(t) : sense.approach.get(t)) : null,
           flee: frozen ? null : sense.swirl.get(t),
           danger: sense.danger.get(t),
           ...vitals,

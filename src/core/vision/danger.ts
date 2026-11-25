@@ -106,6 +106,15 @@ export function fleeSwirl(f: Frame, near = 0.25): Dir[] | null {
 }
 
 /** 走向粉紫光圈（時間停住＝MVP 入口開著時，光圈是傳送門而非催眠師） */
+/**
+ * MVP 勝利後走向淡藍出口（「返回地圖」），不走金色因果路線傳送門
+ * （實機：走進「傳送門：Valhalla」→ Valkyrie 戰滿血被秒殺、整局結束）。
+ */
+export function approachExit(f: Frame): Dir[] | null {
+  const s = findPortalGlow(f, 20, isExitBlue);
+  return s ? dirsFromAngle(Math.atan2(-s.y, s.x)) : null;
+}
+
 export function approachSwirl(f: Frame): Dir[] | null {
   const s = findSwirl(f) ?? findPortalGlow(f);
   if (!s) return null;
@@ -117,19 +126,32 @@ export function approachSwirl(f: Frame): Dir[] | null {
  * 只在時間停住時用：此時遊戲會清掉一般怪物（banish_enemy），畫面上最大一團「高亮、高飽和」的光就是傳送門。
  * 排除藍色系（角色周圍的藍色火焰）、角色中心、HUD 區域；取最大的連通塊，以畫面高度正規化。
  */
-export function findPortalGlow(f: Frame, minPixels = 8): { x: number; y: number } | null {
+const isPortalGlow = (r: number, g: number, b: number) => {
+  const mx = Math.max(r, g, b);
+  if (mx < 220 || mx - Math.min(r, g, b) < 90) return false;
+  return !(b > r + 30 && b > g + 10); // 藍色火焰
+};
+
+/**
+ * MVP 勝利後的出口（「返回地圖」）是淡藍光：實機取樣（2026-11-25）(147,202,241)、(152,173,212)、(161,218,255)；
+ * 藍色火焰是飽和深藍 (45,138,255)、(35,104,230)，R < 90 → 以 R ≥ 110、B-R ≤ 110 區分。
+ */
+const isExitBlue = (r: number, g: number, b: number) =>
+  b > r + 30 && r >= 110 && g >= 150 && b >= 180 && b - r <= 110 && Math.max(r, g, b) - Math.min(r, g, b) >= 50;
+/** 左側 MVP 任務面板（淡藍進度條會被當成出口光） */
+const MVP_PANEL = { x0: 0, y0: 0.28, x1: 0.18, y1: 0.7 };
+
+export function findPortalGlow(f: Frame, minPixels = 8, match = isPortalGlow): { x: number; y: number } | null {
   const { width: W, height: H, data } = f;
   const ok = new Uint8Array(W * H);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
-      const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
-      const mx = Math.max(r, g, b);
-      if (mx < 220 || mx - Math.min(r, g, b) < 90) continue;
-      if (b > r + 30 && b > g + 10) continue; // 藍色火焰
+      if (!match(data[i]!, data[i + 1]!, data[i + 2]!)) continue;
       const fx = x / W, fy = y / H;
       if (fy < 0.13) continue; // 頂部中央的首領/MVP 血條面板（粉紅血條）
       if (HUD_ZONES.some((z) => fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1)) continue;
+      if (match === isExitBlue && fx >= MVP_PANEL.x0 && fx <= MVP_PANEL.x1 && fy >= MVP_PANEL.y0 && fy <= MVP_PANEL.y1) continue;
       if (Math.hypot((x - W / 2) / H, (y - H / 2) / H) < 0.08) continue; // 角色本身
       ok[y * W + x] = 1;
     }

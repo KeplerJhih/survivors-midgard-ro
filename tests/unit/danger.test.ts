@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dodge, findPortalGlow, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
+import { approachExit, dodge, findPortalGlow, fleeSwirl, isDanger, isHypnoSwirl, probeDanger, type DangerProbes } from '@/core/vision/danger';
 import type { Frame } from '@/core/vision/frame';
 
 const W = 160;
@@ -106,5 +106,16 @@ describe('findPortalGlow（時間停住時找 MVP 入口光）', () => {
   });
   it('沒有光 → null', () => {
     expect(findPortalGlow(make([]))).toBeNull();
+  });
+  it('MVP 勝利後的出口：只認淡藍光，不認藍色火焰與金色因果路線傳送門', () => {
+    const dirs = approachExit(
+      make([
+        { x: 120, y: 55, r: 4, c: [150, 200, 240] }, // 淡藍出口（右）
+        { x: 40, y: 55, r: 5, c: [255, 210, 60] }, // 金色因果路線（左，較大）
+        { x: 80, y: 90, r: 4, c: [45, 138, 255] }, // 藍色火焰（下）
+      ]),
+    );
+    expect(dirs).toEqual(['right']);
+    expect(approachExit(make([{ x: 40, y: 55, r: 5, c: [255, 210, 60] }, { x: 80, y: 90, r: 4, c: [45, 138, 255] }]))).toBeNull();
   });
 });

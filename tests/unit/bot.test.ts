@@ -182,3 +182,45 @@ describe('首領血條久不下降 → 依小地圖走向首領', () => {
     expect(bot.state.dirs).toEqual(['left']);
   });
 });
+
+describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () => {
+  it('時間停住期間打過首領 → 改用出口方向；沒打過首領（入口）→ 用入口光方向', () => {
+    let t = 0;
+    let bar = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle' },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachSwirl: () => ['left'],
+        approachExit: () => ['right'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000); // 時鐘在走
+    frozenClock = true;
+    run(5000); // 停住（入口開著）
+    expect(bot.state.frozen).toBe(true);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['left']);
+    bar = 0.003;
+    for (let i = 0; i < 20; i++) (bar -= 0.0001), run(500); // 巢穴內首領戰（血條持續下降）
+    expect(bot.state.boss).toBe(true);
+    bar = 0; // 擊敗
+    run(3000);
+    expect(bot.state.boss).toBe(false);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['right']);
+  });
+});
