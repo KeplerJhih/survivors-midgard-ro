@@ -247,6 +247,18 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeGreaterThan(0.7);
   });
 
+  it('MVP 勝利選擇：小面板內上下兩顆等寬按鈕 → 點上面的「繼續無盡模式」', () => {
+    const f = draw([40, 45, 55], [
+      { x0: 0.353, y0: 0.361, x1: 0.647, y1: 0.639, fill: PANEL },
+      { x0: 0.365, y0: 0.52, x1: 0.635, y1: 0.565, fill: BTN, border: [90, 140, 255] },
+      { x0: 0.365, y0: 0.585, x1: 0.635, y1: 0.63, fill: BTN, border: [189, 201, 230] },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.y).toBeLessThan(0.57);
+    expect(a.y).toBeGreaterThan(0.51);
+  });
+
   it('一般遊玩畫面（只有小 HUD 面板）不動作', () => {
     const f = draw(GRASS, [
       { x0: 0, y0: 0, x1: 0.22, y1: 0.14, fill: PANEL },

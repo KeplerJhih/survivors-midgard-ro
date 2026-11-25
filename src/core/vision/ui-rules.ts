@@ -123,6 +123,9 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
     const p = container(bottom);
     if (p && rw(p) < 0.8) return tap('dialog', bottom[1]!);
   }
+  // 小面板內上下疊兩顆等寬的寬按鈕（MVP 勝利「繼續無盡模式／結束本局」）→ 點上面那顆（遊戲預設焦點、主要選項）
+  const stacked = stackedPair(regions, buttons);
+  if (stacked) return tap('dialog', stacked);
   // 置中、獨立的亮區塊，且周圍被壓暗（遮罩）→ 對話框；按鈕一律靠右下（ALIGNMENT_END）→ 點右下角
   // 實機：「不存放就離開？」的兩顆小按鈕邊框太淡切不出來，整個對話框被當成一塊
   const dlg = dimmedDialog(f, regions);
@@ -164,6 +167,23 @@ export function decideByLayout(f: Frame, regions: Region[], rarity: RarityRank =
   if (tile) return tap('modal', tile);
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
   if (frag) return tap('modal', frag);
+  return null;
+}
+
+/**
+ * 實機（Golden Thief Bug 勝利後走進出口）：「擊敗 MVP！要繼續戰鬥嗎？」小面板（面積 ~0.08），
+ * 兩顆等寬按鈕上下疊：上「繼續無盡模式」（主要、預設焦點）、下「結束本局」。原本被壓暗對話框規則點右下 → 點到結束。
+ * 條件：面積 ≤ 0.15 的面板內，兩顆按鈕中心 x 差 < 0.02、寬差 < 0.03、寬 ≥ 面板寬 60%、上下相鄰（間距 < 0.1）。
+ * 寶箱清單（面板 ~0.27）的獎勵列不受影響。
+ */
+function stackedPair(regions: Region[], buttons: Region[]): Region | null {
+  for (const p of regions) {
+    if ((p.kind !== 'panel' && p.kind !== 'card') || rw(p) * rh(p) > 0.15) continue;
+    const inner = buttons.filter((b) => inside(b, p, 0.01) && rw(b) >= 0.6 * rw(p)).sort((a, b) => cy(a) - cy(b));
+    if (inner.length !== 2) continue;
+    const [top, bottom] = inner as [Region, Region];
+    if (Math.abs(cx(top) - cx(bottom)) < 0.02 && Math.abs(rw(top) - rw(bottom)) < 0.03 && bottom.y0 - top.y1 < 0.1) return top;
+  }
   return null;
 }
 
