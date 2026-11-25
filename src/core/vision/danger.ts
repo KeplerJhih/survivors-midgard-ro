@@ -6,8 +6,13 @@ import { findBlob, type Frame } from './frame';
  * 地面紅色預警框（MVP 技能，例如 Baphomet「Niflheim 斬擊：站到裂痕之間！」的紅色帶狀區域）。
  * 實機取樣（2026-11-25，Baphomet 迷宮）：紅帶本體為深紅 (152,25,27)、(186,35,36)、(173,36,31)；
  * 技能火焰/光效為粉紅或橘紅 (250,180,170)、(250,177,114) → 只認 G、B 都很低的深紅。
+ *
+ * Golden Thief Bug「黃金之火：離開圓圈」是橘紅圓盤：實機取樣（2026-11-25）(247,104,78)、(242,108,84)、(239,128,92)、(244,113,77)；
+ * 與光效的差別在 G ≤ 150（光效 G 170~180）→ 另認亮橘紅。其他實機畫面探測圓最高 5%（門檻 15%）。
  */
-export const isDanger = (r: number, g: number, b: number) => r >= 140 && g <= 70 && b <= 70 && r - g >= 90;
+const isDeepRed = (r: number, g: number, b: number) => r >= 140 && g <= 70 && b <= 70 && r - g >= 90;
+const isFireDisc = (r: number, g: number, b: number) => r >= 210 && g >= 85 && g <= 150 && b <= 110 && r - g >= 90 && r - b >= 120;
+export const isDanger = (r: number, g: number, b: number) => isDeepRed(r, g, b) || isFireDisc(r, g, b);
 
 export interface DangerProbes {
   /** 角色腳下的紅色比例 */

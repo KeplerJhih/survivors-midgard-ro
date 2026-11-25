@@ -22,6 +22,12 @@ describe('isDanger', () => {
     expect(isDanger(250, 177, 114)).toBe(false);
     expect(isDanger(150, 110, 70)).toBe(false); // 泥土
   });
+
+  it('Golden Thief Bug 黃金之火的橘紅圓盤是危險', () => {
+    for (const [r, g, b] of [[247, 104, 78], [242, 108, 84], [239, 128, 92], [244, 113, 77]] as const)
+      expect(isDanger(r, g, b)).toBe(true);
+    expect(isDanger(249, 169, 112)).toBe(false); // 圓盤亮邊（G 偏高）不算
+  });
 });
 
 describe('probeDanger', () => {
