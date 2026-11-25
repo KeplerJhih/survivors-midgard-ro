@@ -565,3 +565,44 @@ describe('辨識不到的視窗（畫面還在動）', () => {
     expect(sent).not.toContain('Enter');
   });
 });
+
+describe('MVP 勝利後出口在畫面外', () => {
+  it('追大圓盤指示器（出口），時間停著就不因 30 秒時限放棄', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => null,
+        approachSwirl: () => ['right'], // 紅色因果路線傳送門的光：不可以走過去
+        findIndicators: () => [{ kind: 'other', x: -0.35, y: 0, icon: [120, 120, 200], size: 0.06 }],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(5000);
+    frozenClock = true;
+    run(5000);
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(3000);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['left']);
+    run(40000);
+    expect(bot.state.activity).toBe('enter');
+    expect(bot.state.dirs).toEqual(['left']);
+  });
+});

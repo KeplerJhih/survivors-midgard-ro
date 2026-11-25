@@ -6,7 +6,7 @@ import { circle, createStrategy, type Strategy } from '../movement/strategies';
 import type { BotConfig } from '../settings';
 import type { DangerProbes } from '../vision/danger';
 import { createBossTracker, createHpTracker, type HpReading } from '../vision/hud';
-import { createIndicatorSeeker, resolvePurple, type Indicator } from '../vision/indicators';
+import { createIndicatorSeeker, LARGE_DISC, resolvePurple, steerToIndicator, type Indicator } from '../vision/indicators';
 import { createPortalSeeker, type PortalScan } from '../vision/portal';
 import { createScreenHandler, type ScreenAction } from '../vision/screens';
 import { createObjectSeeker, type ObjectHit } from '../vision/objects';
@@ -236,6 +236,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       },
       null as Dir[] | null,
     ),
+    // 傳送門指示器：只看大圓盤（chest_pointer.gd：MVP 入口 / 勝利後的「返回地圖」出口半徑 24，寶箱 19）。
+    // 圓盤只在傳送門不在畫面上時出現，且紅色因果路線傳送門沒有指示器 → 追它一定是入口 / 出口，與顏色無關
+    pointer: throttle(
+      INTERVAL.indicator,
+      () => {
+        const list = deps.findIndicators?.() ?? null;
+        if (!list) return null;
+        return steerToIndicator(list.filter((i) => i.size >= LARGE_DISC).map((i) => ({ ...i, kind: 'target' as const })));
+      },
+      null as Dir[] | null,
+    ),
     target: throttle(
       INTERVAL.indicator,
       () => {
@@ -365,7 +376,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       if (vitals.boss) {
         lastBossAt = t;
         if (frozen) mvpFight = true;
-      } else if (t - lastBossAt > EXIT_WINDOW) mvpFight = false;
+      }
+      // 時間還停著＝還在巢穴裡（非無盡模式勝利後時鐘不會走）→ 繼續找出口，不因時限放棄
+      else if (t - lastBossAt > EXIT_WINDOW && !frozen) mvpFight = false;
       // 低血量時撤退優先（實機：勝利選擇後回到地圖仍在找出口，HP 9% 照樣亂走）
       const exitSeek = mvpFight && !vitals.boss && !vitals.lowHp;
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
@@ -383,10 +396,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           // 入口開著（時間停住、沒首領）：畫面上的入口光優先；傳送門在畫面外時改追邊緣指示器
           // （ui/chest_pointer.gd：傳送門圓盤半徑 24 比寶箱 19 大，排序優先；與顏色無關）。
           // 實機：原本時間停住就不看指示器，傳送門在畫面外只能靠走位碰運氣
+          // 傳送門指示器優先（只在傳送門於畫面外時出現，最可靠）；在畫面內才靠光：出口找淡藍、入口找高亮光
           approach: exitSeek
-            ? sense.exit.get(t)
+            ? (sense.pointer.get(t) ?? sense.exit.get(t))
             : frozen && !vitals.boss
-              ? (sense.approach.get(t) ?? sense.target.get(t))
+              ? (sense.pointer.get(t) ?? sense.approach.get(t))
               : null,
           flee: frozen || exitSeek ? null : sense.swirl.get(t),
           danger: sense.danger.get(t),
