@@ -16,7 +16,7 @@ import { detectScreen } from '@/core/vision/screens';
 import { parseLayout } from '@/core/vision/layout';
 import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
-import { approachExit, approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
+import { approachExit, approachSwirl, detectSnapRing, fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { clockGlyph } from '@/core/vision/clock';
 import { bossBar, readHp } from '@/core/vision/hud';
 import { findMinimapSquare, MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
@@ -89,6 +89,10 @@ export default defineContentScript({
       probeDanger: () => {
         const frame = sample();
         return frame ? probeDanger(frame) : null;
+      },
+      snapRing: () => {
+        const frame = sampleHi();
+        return frame ? detectSnapRing(frame) : false;
       },
       clockGlyph: () => {
         const frame = sampleMinimap();

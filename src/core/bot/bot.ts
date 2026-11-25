@@ -20,7 +20,7 @@ const DIRS: readonly Dir[] = ['up', 'down', 'left', 'right'];
 
 export interface BotState {
   running: boolean;
-  activity: Activity | 'screen' | 'sync';
+  activity: Activity | 'screen' | 'sync' | 'hold';
   boss: boolean;
   /** 遊戲時間停住（MVP 入口開著等） */
   frozen: boolean;
@@ -51,6 +51,8 @@ export interface BotDeps {
   detectScreen?: () => ScreenAction | null;
   findIndicators?: () => Indicator[] | null;
   probeDanger?: () => DangerProbes | null;
+  /** 腳下的「倒數結束不要動」環（催眠閃光） */
+  snapRing?: () => boolean;
   fleeSwirl?: () => Dir[] | null;
   readHp?: () => HpReading | null;
   /** 小地圖（玩家箭頭、首領點） */
@@ -99,6 +101,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let boss = false;
   let screenStreak = 0;
   let mvpFight = false;
+  let holdUntil = -Infinity;
   let hpSeenAt = -Infinity;
   let lastBossAt = -Infinity;
 
@@ -198,6 +201,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
+    snap: throttle(INTERVAL.danger, () => (config.dodge && deps.snapRing ? deps.snapRing() : false), false),
   };
 
   return {
@@ -248,6 +252,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         for (const d of DIRS) keyboard.up(d);
         state.dirs = [];
         state.activity = 'sync';
+        return;
+      }
+
+      // 催眠閃光：腳下出現空心紅環 → 站著不動直到環消失後 0.6 秒（倒數結束時有移動扣 30% HP；
+      // 環與火焰同色，若交給躲避會往外閃，正好相反）
+      if (sense.snap.get(t)) holdUntil = t + 600;
+      if (t < holdUntil) {
+        for (const d of DIRS) keyboard.up(d);
+        state.dirs = [];
+        if (state.activity !== 'hold') log?.info('snap: 腳下倒數環，站著不動');
+        state.activity = 'hold';
         return;
       }
 

@@ -182,3 +182,39 @@ export function findPortalGlow(f: Frame, minPixels = 8, match = isPortalGlow): {
   }
   return best ? { x: (best.x - W / 2) / H, y: (best.y - H / 2) / H } : null;
 }
+
+/**
+ * Golden Thief Bug「催眠閃光：倒數結束時不要動！」（raid_trials.gd snap, mode stop）：角色腳下出現環，
+ * 倒數結束時有移動就扣 30% HP。實機：環與火焰圓圈同色（(240,100,80)），但它是**以角色為中心的空心環**：
+ * 半徑 0.03~0.075H 的環帶 8 個方向都有紅（每方向 ≥ 15%），環內（< 0.02H，只有角色本身）紅 < 40%。
+ * 火焰圓圈是實心、通常不以角色為中心 → 不符合；正好蓋在角色上時（角色遮住中心）靠環外仍有大量紅排除。
+ */
+export function detectSnapRing(f: Frame): boolean {
+  const { width: W, height: H, data } = f;
+  const cx = W / 2, cy = H / 2;
+  const sec = new Array(8).fill(0);
+  const tot = new Array(8).fill(0);
+  let inner = 0, innerN = 0, outer = 0, outerN = 0;
+  const R = 0.12 * H;
+  for (let y = Math.max(0, Math.floor(cy - R)); y <= Math.min(H - 1, Math.ceil(cy + R)); y++)
+    for (let x = Math.max(0, Math.floor(cx - R)); x <= Math.min(W - 1, Math.ceil(cx + R)); x++) {
+      const dx = (x - cx) / H, dy = (y - cy) / H;
+      const d = Math.hypot(dx, dy);
+      const i = (y * W + x) * 4;
+      const red = data[i]! - data[i + 1]! >= 70 && data[i]! - data[i + 2]! >= 70;
+      if (d < 0.02) {
+        innerN++;
+        if (red) inner++;
+      } else if (d >= 0.03 && d <= 0.075) {
+        const s = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+        tot[s]++;
+        if (red) sec[s]++;
+      } else if (d >= 0.095 && d <= 0.12) {
+        outerN++;
+        if (red) outer++;
+      }
+    }
+  if (!innerN || !outerN || tot.some((n) => n === 0)) return false;
+  // 環外（0.095~0.12H）紅要少：實機火焰圓圈正好蓋在角色身上時環外仍 30~45% 紅，倒數環 0~20%
+  return Math.min(...sec.map((v, k) => v / tot[k])) >= 0.15 && inner / innerN < 0.4 && outer / outerN < 0.25;
+}
