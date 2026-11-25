@@ -59,13 +59,20 @@ export interface HpTracker {
 export function createHpTracker(): HpTracker {
   let full = 0;
   let hpY = Infinity;
+  let misses = 0;
   return {
     update(r) {
       if (!r) return null;
       // HP 是最上面那條；讀到比看過的 HP 列更下面的條 = HP 條這一刻沒抓到、抓到經驗條
       // （實機：滿血卻讀成 0.2 = 經驗 23%，誤觸低血量撤退）→ 當讀不到
       if (r.y !== undefined) {
-        if (r.y > hpY + 0.012) return null;
+        if (r.y > hpY + 0.012) {
+          // 連續多次都在下面＝記住的 HP 列是錯的（被上方其他藍色撐高）→ 重新學
+          if (++misses < 6) return null;
+          hpY = Infinity;
+          full = 0;
+        }
+        misses = 0;
         // 找到更上面的列＝先前抓到的是下面的條（例如重新載入後第一筆就是經驗條）→ 滿血長度重算
         if (r.y < hpY - 0.012) full = 0;
         hpY = Math.min(hpY, r.y);

@@ -99,6 +99,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let boss = false;
   let screenStreak = 0;
   let mvpFight = false;
+  let hpSeenAt = -Infinity;
   let lastBossAt = -Infinity;
 
   const portalSeeker = createPortalSeeker();
@@ -147,8 +148,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         state.hp = hp ? Math.round(hp.ratio * 100) / 100 : -1;
         // 遲滯：低於門檻進入撤退，回到門檻 +0.2 才解除（實機：無盡模式後期 HP 0.5 → 0 只要 2~3 秒，
         // 門檻 0.35 進撤退時已來不及）；讀不到時沿用
+        if (hp) hpSeenAt = now();
+        // 讀不到時沿用，但最多 5 秒（實機：HP 列學錯後一直讀不到，卡在撤退）
         const nowLow =
-          hp === null ? lowHp : hp.low || hp.ratio < (lowHp ? Math.min(0.9, config.lowHpRatio + 0.2) : config.lowHpRatio);
+          hp === null
+            ? lowHp && now() - hpSeenAt < 5000
+            : hp.low || hp.ratio < (lowHp ? Math.min(0.9, config.lowHpRatio + 0.2) : config.lowHpRatio);
         if (nowLow && !lowHp) log?.info('hp: 低血量，停止追目標、改大圈移動', hp);
         const b = bossTracker.update(config.bossKite && deps.bossBar ? deps.bossBar() : 0, now());
         // 血條很久沒下降＝沒打到（首領在畫面外）→ 不風箏，照一般走位 / 追指示器去找它

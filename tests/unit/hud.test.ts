@@ -44,6 +44,13 @@ describe('createHpTracker', () => {
     expect(t.update({ fill: 19, low: false, y: 0.041 })!.ratio).toBeCloseTo(0.95);
   });
 
+  it('記住的 HP 列錯了（太上面）→ 連續 6 次都讀到下面的列就重新學', () => {
+    const t = createHpTracker();
+    t.update({ fill: 30, low: false, y: 0.01 });
+    for (let i = 0; i < 5; i++) expect(t.update({ fill: 20, low: false, y: 0.04 })).toBeNull();
+    expect(t.update({ fill: 20, low: false, y: 0.04 })!.ratio).toBe(1);
+  });
+
   it('第一筆就抓到較長的經驗條：之後讀到上面的 HP 列時滿血長度重算', () => {
     const t = createHpTracker();
     t.update({ fill: 40, low: false, y: 0.09 });
