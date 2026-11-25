@@ -39,6 +39,7 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
   let nowT = 0;
   let state = false;
   let seenAt = -Infinity;
+  let pending = false;
   return {
     get ticking() {
       return ticked && nowT - changedAt < 10000;
@@ -53,20 +54,32 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
       // 實機：進 MVP 巢穴的載入畫面把狀態清掉，之後時鐘一直停在 11:00 → 永遠判定不出停住 → 勝利後不知道在巢穴裡
       if (!glyph || on < 10) return now - seenAt <= 5000 ? state : false;
       seenAt = now;
-      if (last && last.length === glyph.length) {
+      const diff = (a: Uint8Array) => {
         let d = 0;
-        for (let i = 0; i < glyph.length; i++) d += glyph[i]! ^ last[i]!;
+        for (let i = 0; i < glyph.length; i++) d += glyph[i]! ^ a[i]!;
         // 實機：每秒變一位數時差異 32~115 px（字形約 820 px），10% 門檻會把部分秒數當成沒變 → 2%
-        if (d > Math.max(3, Math.max(on, lastOn) * 0.02)) {
-          changedAt = now;
-          ticked = true;
+        return d > Math.max(3, Math.max(on, lastOn) * 0.02);
+      };
+      if (last && last.length === glyph.length) {
+        // 變化要「下一筆沒有變回原樣」才算走動：實機巢穴內傷害數字 / 閃光飄過時鐘一瞬間（差異 146 px）
+        // 被當成走動 → 「停住」中斷 3 秒。時鐘真的在走時下一筆仍和舊字形不同 → 只晚一筆確認
+        if (pending) {
+          if (diff(last)) {
+            changedAt = now;
+            ticked = true;
+            last = glyph;
+          }
+          pending = false;
+        } else if (diff(last)) {
+          pending = true;
         }
-      } else if (!last) {
-        changedAt = now; // 第一次：開始計時
+      } else {
+        // 第一次：開始計時；長度不同（方框由上下邊找到 / 由單邊推算，寬差幾 px）：只換參考字形，不重新計時
+        // （實機：入口開著時兩種方式交替 → 每次都重置 → 「停住」閃動）
+        if (!last) changedAt = now;
+        last = glyph;
+        pending = false;
       }
-      // 長度不同（方框由上下邊找到 / 由單邊推算，寬差幾 px）：只換參考字形，不重新計時
-      // （實機：入口開著時兩種方式交替 → 每次都重置 → 「停住」閃動）
-      last = glyph;
       lastOn = on;
       return (state = ticked && now - changedAt >= freezeMs);
     },

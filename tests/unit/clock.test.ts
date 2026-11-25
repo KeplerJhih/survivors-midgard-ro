@@ -11,9 +11,21 @@ describe('createFreezeDetector', () => {
     let t = 0;
     for (let s = 0; s < 4; s++, t += 1000) expect(d.update(glyph(s), t)).toBe(false);
     expect(d.ticking).toBe(true);
-    for (let s = 0; s < 3; s++, t += 1000) d.update(glyph(99), t);
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(99), t); // 變化下一筆確認 → 晚一筆
     expect(d.update(glyph(99), t)).toBe(true);
-    expect(d.update(glyph(100), t + 1000)).toBe(false);
+    expect(d.update(glyph(100), t + 1000)).toBe(true); // 恢復走動也要下一筆確認
+    expect(d.update(glyph(101), t + 2000)).toBe(false);
+  });
+
+  it('停住期間時鐘被飄過的東西蓋住一瞬間（下一筆變回原樣）不算走動', () => {
+    const d = createFreezeDetector(3000);
+    let t = 0;
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(s), t);
+    for (let i = 0; i < 5; i++, t += 1000) d.update(glyph(50), t);
+    expect(d.update(glyph(50), t)).toBe(true);
+    expect(d.update(glyph(77), t + 1000)).toBe(true); // 傷害數字飄過
+    expect(d.update(glyph(50), t + 2000)).toBe(true);
+    expect(d.update(glyph(50), t + 3000)).toBe(true);
   });
 
   it('沒看過走動（開局就停住）、讀不到時鐘都不判定', () => {
@@ -27,7 +39,7 @@ describe('createFreezeDetector', () => {
     const d = createFreezeDetector(3000);
     let t = 0;
     for (let s = 0; s < 3; s++, t += 1000) d.update(glyph(s), t);
-    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(50), t);
+    for (let s = 0; s < 5; s++, t += 1000) d.update(glyph(50), t);
     expect(d.update(null, t)).toBe(true);
     expect(d.update(glyph(50), t + 1000)).toBe(true);
   });
@@ -60,7 +72,7 @@ describe('createFreezeDetector', () => {
     const e = createFreezeDetector(3000);
     t = 0;
     for (let s = 0; s < 3; s++, t += 1000) e.update(glyph(s), t);
-    for (let s = 0; s < 4; s++, t += 1000) e.update(glyph(50), t);
+    for (let s = 0; s < 5; s++, t += 1000) e.update(glyph(50), t);
     const last = t - 1000;
     expect(e.update(null, last + 4000)).toBe(true);
     expect(e.update(null, last + 6000)).toBe(false);
