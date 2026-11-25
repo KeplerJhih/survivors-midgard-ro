@@ -31,6 +31,20 @@ describe('createFreezeDetector', () => {
     expect(d.update(null, t)).toBe(true);
     expect(d.update(glyph(50), t + 1000)).toBe(true);
   });
+
+  it('時鐘在走時長時間讀不到（圖示壓住小地圖邊框）不會變成停住；讀不到超過 5 秒停住狀態也解除', () => {
+    const d = createFreezeDetector(3000);
+    let t = 0;
+    for (let s = 0; s < 4; s++, t += 1000) d.update(glyph(s), t);
+    for (let i = 0; i < 10; i++, t += 1000) expect(d.update(null, t)).toBe(false);
+    const e = createFreezeDetector(3000);
+    t = 0;
+    for (let s = 0; s < 3; s++, t += 1000) e.update(glyph(s), t);
+    for (let s = 0; s < 4; s++, t += 1000) e.update(glyph(50), t);
+    const last = t - 1000;
+    expect(e.update(null, last + 4000)).toBe(true);
+    expect(e.update(null, last + 6000)).toBe(false);
+  });
 });
 
 describe('findMinimapSquare + clockGlyph', () => {

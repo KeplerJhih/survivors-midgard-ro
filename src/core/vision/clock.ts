@@ -37,19 +37,24 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
   let changedAt = -Infinity;
   let ticked = false;
   let nowT = 0;
+  let state = false;
+  let seenAt = -Infinity;
   return {
     get ticking() {
       return ticked && nowT - changedAt < 10000;
     },
     update(glyph, now) {
       nowT = now;
-      if (!glyph) return ticked && last !== null && now - changedAt >= freezeMs;
+      // 讀不到（實機：角色/首領圖示壓在小地圖下緣，方框找不到）：沿用上次結果；
+      // 超過 5 秒都讀不到就當沒停住（原本用「上次變化至今」判斷，讀不到 3 秒就誤判停住）
+      if (!glyph) return now - seenAt <= 5000 ? state : false;
+      seenAt = now;
       let on = 0;
       for (let i = 0; i < glyph.length; i++) on += glyph[i]!;
       if (on < 10) {
         last = null;
         ticked = false;
-        return false;
+        return (state = false);
       }
       if (last && last.length === glyph.length) {
         let d = 0;
@@ -64,7 +69,7 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
       }
       last = glyph;
       lastOn = on;
-      return ticked && now - changedAt >= freezeMs;
+      return (state = ticked && now - changedAt >= freezeMs);
     },
   };
 }
