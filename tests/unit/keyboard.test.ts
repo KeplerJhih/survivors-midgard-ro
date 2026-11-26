@@ -29,6 +29,21 @@ describe('keyboard', () => {
     expect(events.map((e) => e.type)).toEqual(['keydown']);
   });
 
+  it('按住超過 REPEAT_MS 再 down → 補送 keydown（遊戲自行放開按鍵後還能恢復）', () => {
+    const target = new EventTarget();
+    const types: string[] = [];
+    target.addEventListener('keydown', () => types.push('keydown'));
+    let t = 0;
+    const kb = createKeyboard(target, { sleep: async () => {}, now: () => t });
+    kb.down('up');
+    t = 200;
+    kb.down('up');
+    expect(types).toEqual(['keydown']);
+    t = 700;
+    kb.down('up');
+    expect(types).toEqual(['keydown', 'keydown']);
+  });
+
   it('tap = keydown + keyup', async () => {
     const { kb, events } = setup();
     await kb.tap('pick1');

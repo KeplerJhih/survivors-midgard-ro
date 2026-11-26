@@ -541,9 +541,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const rawSeen = deps.gameSync?.busy ? null : sense.screen.get(t);
       if (rawSeen) lastWindowAt = t;
       // 城鎮：沒有 HP 條、時鐘也不走 → 明亮石板地會被當成結算頁 / 視窗，點到扭蛋機、NPC（實機 Prontera）
-      // 開啟外掛後還沒看過 HP 條也算（在城鎮開外掛會立刻亂點；開局的初始技能請手動選或等 HUD 出現）
-      // HP 讀數偶爾整段失效（實機 Valhalla：左側 MVP 面板出現後一直 -1）→ 小地圖也看得到就還在對局（城鎮沒有小地圖）
-      const hudGone = !!deps.readHp && t - Math.max(hpSeenAt, mmSeenAt) >= TOWN_NO_HUD_MS;
+      // 從開外掛起算：視窗蓋住 HUD 時才開外掛（實機：勝利選擇「以無盡模式繼續」畫面）也要能點；
+      // HP 讀數會整段失效（實機 Valhalla：左側 MVP 面板出現後一直 -1）→ 小地圖看得到也算在對局（城鎮沒有小地圖）
+      const hudGone = !!deps.readHp && t - Math.max(hpSeenAt, mmSeenAt, startedAt) >= TOWN_NO_HUD_MS;
       // 結算頁會把 HUD 整個藏起來（menus.gd show_end：world.hud.hide()）→ HP 條還讀得到就不是結算頁。
       // 實機：巢穴淺色石板地讓舊「結算頁」顏色規則成立，一直點底部技能列（跳出技能說明）而不去出口
       sense.vitals.get(t);

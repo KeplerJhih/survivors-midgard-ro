@@ -1,7 +1,7 @@
 import { KEYS, type KeyName } from '../keys';
 
 export interface Keyboard {
-  /** 按下並保持；已按住則忽略（不送重複 keydown） */
+  /** 按下並保持；已按住則忽略，但距上次送出 ≥ REPEAT_MS 會補送一次 keydown（見 down） */
   down(name: KeyName): void;
   /** 放開；沒按住則忽略 */
   up(name: KeyName): void;
@@ -14,7 +14,11 @@ export interface Keyboard {
 export interface KeyboardOptions {
   sleep?: (ms: number) => Promise<void>;
   onSend?: (type: 'keydown' | 'keyup', name: KeyName) => void;
+  now?: () => number;
 }
+
+/** 按住的鍵每隔這麼久補送 keydown（像實體鍵盤的自動重複） */
+export const REPEAT_MS = 500;
 
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -22,6 +26,8 @@ const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 export function createKeyboard(target: EventTarget, opts: KeyboardOptions = {}): Keyboard {
   const sleep = opts.sleep ?? defaultSleep;
   const held = new Set<KeyName>();
+  const now = opts.now ?? (() => performance.now());
+  const sentAt = new Map<KeyName, number>();
 
   const send = (type: 'keydown' | 'keyup', name: KeyName) => {
     const k = KEYS[name];
@@ -40,8 +46,13 @@ export function createKeyboard(target: EventTarget, opts: KeyboardOptions = {}):
 
   const kb: Keyboard = {
     down(name) {
-      if (held.has(name)) return;
+      // 已按住：遊戲可能已自行放開（失焦、暫停視窗時 Godot 會清掉按鍵狀態），我們卻以為還按著、不再送 →
+      // 角色停住不動（實機：巢穴裡一直「按著上」卻原地不動）。像實體鍵盤一樣定期補送 keydown
+      if (held.has(name)) {
+        if (now() - (sentAt.get(name) ?? -Infinity) < REPEAT_MS) return;
+      }
       held.add(name);
+      sentAt.set(name, now());
       send('keydown', name);
     },
     up(name) {

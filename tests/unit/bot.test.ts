@@ -312,7 +312,10 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
         pointer: { tap: async (x, y) => void taps.push([x, y]) },
       },
     );
-    for (; t < 70000; t += 250) bot.tick(); // 在城鎮開外掛：一開始就不點
+    for (; t < 1000; t += 250) bot.tick(); // 剛開外掛（可能停在蓋住 HUD 的視窗上）→ 照常點
+    expect(taps.length).toBeGreaterThan(0);
+    taps.length = 0;
+    for (t = 61000; t < 70000; t += 250) bot.tick(); // 60 秒都沒看到 HUD＝城鎮 → 不點
     expect(taps).toEqual([]);
     expect(bot.state.activity).not.toBe('screen');
   });
