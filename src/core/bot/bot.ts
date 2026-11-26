@@ -460,16 +460,15 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   /** 入口開著時的走向（記錄來源供除錯：指示器 / 畫面光 / 小地圖回入口位置） */
   const entryApproach = (t: number): Dir[] | null => {
     // 指示圓盤會閃（被特效、樹影蓋住一兩筆）→ 3 秒內沿最後方向走，不馬上改成回入口位置 / 繞圈（實機：兩者交替來回）
-    // 指示圓盤優先（只在入口不在畫面上時出現，且只收畫面邊緣的，最可靠）。
-    // 曾改成名稱優先（塔的拱窗被當成圓盤），根因是角色自己被當成頭像圓盤、已用「須在畫面邊緣」修掉；
-    // 名稱優先反而會被粉白色的東西騙（實機：入口在左、指示圓盤也在左，卻追右下的催眠漩渦）
+    // 入口在畫面上：看頭上的名稱（固定淡粉白＋黑框，與 MVP 種類無關；實機 Dark Lord 入口光淡又細，光的判斷認不出）。
+    // 名稱優先於指示圓盤：看得到名稱時入口就在畫面上，此時的「圓盤」多半是任務「!」等其他指示
+    // （實機：入口在左、名稱看得到，卻追右下的任務圓盤）。名稱誤判（粉紅催眠漩渦）已用黑框檢查排除
+    const l = sense.label.get(t);
+    if (l) return (searchStart = null), (lastPointer = null), (state.enterSrc = 'label'), l;
     const p = sense.pointer.get(t);
     if (p) lastPointer = { dirs: p, at: t };
     else if (lastPointer && t - lastPointer.at < POINTER_COAST_MS) return (state.enterSrc = 'pointer~'), lastPointer.dirs;
     if (p) return (searchStart = null), (state.enterSrc = 'pointer'), p;
-    // 入口在畫面上：看頭上的名稱（固定淡粉白，與 MVP 種類無關；實機 Dark Lord 入口光淡又細，光的判斷認不出）
-    const l = sense.label.get(t);
-    if (l) return (searchStart = null), (state.enterSrc = 'label'), l;
     const g = sense.approach.get(t);
     if (g) return (searchStart = null), (state.enterSrc = 'glow'), g;
     const h = backToPortalHome();

@@ -87,6 +87,14 @@ export function findPortalLabel(f: Frame): { x: number; y: number } | null {
     // 一行文字：高 0.015~0.07H、寬至少 2 倍高；筆畫像素夠多
     // 實機名稱（「傳送門：Dark Lord」，640 寬取樣）：45 px、核心 ≥ 3
     if (h < 0.015 || h > 0.07 || w < 2 * h || n < 20 || c < 3) continue;
+    // 名稱有黑色外框（_label outline）：框內暗像素要夠多。實機：粉紅的催眠師漩渦顏色相近、沒有黑框 → 被當成入口名稱
+    let dark = 0;
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const i = (y * W + x) * 4;
+        if (data[i]! + data[i + 1]! + data[i + 2]! < 180) dark++;
+      }
+    if (dark < 0.15 * n) continue;
     if (!best || n > best.n) best = { n, x0, x1, y1, sx };
   }
   if (!best) return null;
