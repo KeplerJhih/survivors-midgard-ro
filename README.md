@@ -43,6 +43,7 @@ src/core/            純邏輯，不依賴 chrome.* API，可單獨測試
   bot/               掛機主迴圈：bot.ts（感知→視窗→決策→按鍵）、decide.ts（移動優先順序，純函式）、throttle.ts（感知節流）
   spoof/mobile       iPhone 偽裝（UA、platform、maxTouchPoints、matchMedia）
   touch/             滑鼠 → 觸控事件
+  display/aspect     掛機時鎖定遊戲畫面比例 2.2:1（辨識只認這一種版面）
   background/        背景執行：接管 rAF + Worker 時脈
   debug/overlay      debug 面板
 src/entrypoints/     WXT 外掛殼
@@ -70,5 +71,6 @@ tests/unit/          單元測試
 ## 注意
 
 - 「模擬 iPhone」「背景持續執行」改完要重新整理遊戲頁
+- 掛機啟動時遊戲畫面會固定成 2.2:1 並留黑邊（停止掛機還原）；視窗建議寬度 ≥ 1080，詳見 docs/FEATURES.md「畫面定版」
 - 自動按 Enter 在城鎮會開啟世界聊天，只在對局中使用
 - 背景執行靠 Worker 時脈；Chrome 的「省記憶體模式」仍可能捨棄閒置分頁，建議把網站加入例外
