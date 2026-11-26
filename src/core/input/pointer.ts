@@ -30,6 +30,11 @@ export function createPointer(canvas: HTMLElement, isTouch: () => boolean): Poin
         canvas.dispatchEvent(new MouseEvent('mousedown', opts));
         await sleep(80);
         canvas.dispatchEvent(new MouseEvent('mouseup', opts));
+        // 滑鼠停在剛點的位置會跳出說明框（實機：結算頁物品格的物品說明蓋住畫面 → 認不出物品格，帶回物品中斷）
+        // → 點完移到畫面最上緣中央（沒有 UI 的地方）
+        await sleep(30);
+        const park = { clientX: r.left + 0.5 * r.width, clientY: r.top + 1, bubbles: true, cancelable: true };
+        canvas.dispatchEvent(new MouseEvent('mousemove', park));
       }
     },
   };
