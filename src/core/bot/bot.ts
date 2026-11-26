@@ -183,17 +183,13 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   };
   let keepTaken = 0;
   /** 目前分頁（以按下的分頁 x 位置識別）、這頁點了幾格、試過切到哪些分頁 */
-  let keepPage: number | null = null;
   let keepPageTaps = 0;
   const keepTabTried = new Set<number>();
   const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
     const tabs = act.keepTabs ?? [];
     const cur = tabs.find((t) => t.pressed);
-    const page = cur ? Math.round(cur.x * 100) : -1;
-    if (page !== keepPage) {
-      keepPage = page;
-      keepPageTaps = 0;
-    }
+    // 只有自己點了分頁才從第 1 格重算：「按下」的分頁靠亮度差判斷，取樣間會閃 → 原本一閃就重算，
+    // 同一格被點 3 次（存 → 取消 → 存），只帶回 1 件（實機）
     const tile = act.keep?.[keepPageTaps];
     if (tile) {
       keepPageTaps++;
@@ -205,6 +201,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     const next = tabs.filter((t) => t.x > cur.x + 0.01).sort((a, b) => a.x - b.x)[0];
     if (!next || keepTabTried.has(Math.round(next.x * 100))) return null;
     keepTabTried.add(Math.round(next.x * 100));
+    keepPageTaps = 0;
     return { x: next.x, y: next.y, what: 'tab' };
   };
   let detourUntil = -Infinity;
@@ -583,8 +580,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           {
             t,
             kind: act.kind,
-            x: +act.x.toFixed(3),
-            y: +act.y.toFixed(3),
+            // 帶回物品時記實際點的格子（除錯：原本記成結算按鈕位置，看不出點了哪格）
+            x: +(keepStep ?? act).x.toFixed(3),
+            y: +(keepStep ?? act).y.toFixed(3),
             keep: act.keep?.length ?? 0,
             how: keepStep ? `keep:${keepStep.what}` : enter ? 'enter' : 'tap',
           },
@@ -601,7 +599,6 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           if (act.kind === 'result') {
             setWon(false); // 離開結算頁＝下一局重新計
             keepTaken = 0;
-            keepPage = null;
             keepPageTaps = 0;
             keepTabTried.clear();
           }

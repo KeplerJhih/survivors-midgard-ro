@@ -1132,6 +1132,40 @@ describe('破關帶回：最高分頁不足 3 件', () => {
   });
 });
 
+describe('帶回物品：分頁「按下」判斷閃爍', () => {
+  it('按下的分頁在取樣間閃爍（有時認不出）→ 仍依序點 3 格，不重複點同一格', () => {
+    let t = 0;
+    let n = 0;
+    const taps: string[] = [];
+    const store = { v: true };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () => {
+          n++;
+          return {
+            kind: 'result',
+            x: 0.47,
+            y: 0.94,
+            keep: [0.3, 0.34, 0.38, 0.42].map((x) => ({ x, y: 0.8 })),
+            keepTabs: [
+              { x: 0.45, y: 0.69, pressed: n % 2 === 0 },
+              { x: 0.5, y: 0.69, pressed: false },
+            ],
+          };
+        },
+        pointer: { tap: async (x) => void taps.push(`${x}`) },
+      },
+    );
+    for (; t < 20000; t += 250) bot.tick();
+    expect(taps.slice(0, 3)).toEqual(['0.3', '0.34', '0.38']);
+  });
+});
+
 describe('一般走位撞牆', () => {
   it('按著方向鍵小地圖位置 2 秒沒動 → 轉 90° 繞路', () => {
     let t = 0;
