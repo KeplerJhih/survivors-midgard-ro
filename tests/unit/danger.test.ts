@@ -193,3 +193,19 @@ describe('approachExit：避開因果路線傳送門', () => {
     expect(approachExit(f)).toEqual(['right']);
   });
 });
+
+describe('approachExit：大片淡藍水面不是出口', () => {
+  it('左下大片水面（Niflheim 巢穴）＋右上小圈出口光 → 走向右上的出口', () => {
+    const WATER = [150, 205, 240]; // 和出口光一樣是淡藍
+    const f = frame((x, y) => {
+      if (x < 50 && y > 60) return WATER; // 大片水面
+      const dx = x - 125, dy = y - 35;
+      const d = Math.hypot(dx, dy);
+      if (d >= 5 && d <= 8) return [161, 218, 255]; // 出口光圈
+      return null;
+    });
+    const dirs = approachExit(f)!;
+    expect(dirs).toContain('right');
+    expect(dirs).toContain('up');
+  });
+});

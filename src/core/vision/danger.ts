@@ -167,6 +167,8 @@ const isPortalGlow = (r: number, g: number, b: number) => {
  */
 const isExitBlue = (r: number, g: number, b: number) =>
   b > r + 30 && r >= 110 && g >= 150 && b >= 180 && b - r <= 110 && Math.max(r, g, b) - Math.min(r, g, b) >= 50;
+/** 出口光圈外框上限（畫面高度比例） */
+const EXIT_MAX_SIZE = 0.3;
 /** 左側 MVP 任務面板（淡藍進度條會被當成出口光） */
 const MVP_PANEL = { x0: 0, y0: 0.28, x1: 0.18, y1: 0.7 };
 
@@ -193,13 +195,17 @@ export function findPortalGlow(f: Frame, minPixels = 8, match = isPortalGlow): {
     if (!ok[p0] || seen[p0]) continue;
     seen[p0] = 1;
     stack.push(p0);
-    let n = 0, sx = 0, sy = 0;
+    let n = 0, sx = 0, sy = 0, x0 = W, x1 = 0, y0 = H, y1 = 0;
     while (stack.length) {
       const p = stack.pop()!;
       const x = p % W, y = (p / W) | 0;
       n++;
       sx += x;
       sy += y;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
       // 8 鄰接（光暈常是點狀散開）
       for (let dy = -1; dy <= 1; dy++)
         for (let dx = -1; dx <= 1; dx++) {
@@ -209,6 +215,8 @@ export function findPortalGlow(f: Frame, minPixels = 8, match = isPortalGlow): {
           if (ok[q] && !seen[q]) (seen[q] = 1), stack.push(q);
         }
     }
+    // 出口光圈只有約 0.14H × 0.11H（實機）；大片淡藍是地形（實機 Niflheim 巢穴的水面 → 一直往水裡走、卡住出不去）
+    if (match === isExitBlue && ((x1 - x0 + 1) / H > EXIT_MAX_SIZE || (y1 - y0 + 1) / H > EXIT_MAX_SIZE)) continue;
     if (n >= minPixels && (!best || n > best.n)) best = { n, x: sx / n, y: sy / n };
   }
   return best ? { x: (best.x - W / 2) / H, y: (best.y - H / 2) / H } : null;
