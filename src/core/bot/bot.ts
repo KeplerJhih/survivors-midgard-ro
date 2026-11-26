@@ -533,7 +533,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 城鎮：沒有 HP 條、時鐘也不走 → 明亮石板地會被當成結算頁 / 視窗，點到扭蛋機、NPC（實機 Prontera）
       // 開啟外掛後還沒看過 HP 條也算（在城鎮開外掛會立刻亂點；開局的初始技能請手動選或等 HUD 出現）
       const hudGone = !!deps.readHp && t - hpSeenAt >= TOWN_NO_HUD_MS;
-      const seen = gameRunning || hudGone ? null : rawSeen;
+      // 結算頁會把 HUD 整個藏起來（menus.gd show_end：world.hud.hide()）→ HP 條還讀得到就不是結算頁。
+      // 實機：巢穴淺色石板地讓舊「結算頁」顏色規則成立，一直點底部技能列（跳出技能說明）而不去出口
+      sense.vitals.get(t);
+      const resultWithHud = rawSeen?.kind === 'result' && !!deps.readHp && t - hpSeenAt < 1500;
+      const seen = gameRunning || hudGone || resultWithHud ? null : rawSeen;
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       if (act && pointer) {

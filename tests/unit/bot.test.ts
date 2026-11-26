@@ -317,6 +317,28 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
     expect(bot.state.activity).not.toBe('screen');
   });
 
+  it('HP 條還讀得到時的「結算頁」是誤判（巢穴淺色地面）→ 不點；HUD 消失後才點', () => {
+    let t = 0;
+    let hud = true;
+    const taps: [number, number][] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        readHp: () => (hud ? { fill: 20, low: false } : null),
+        detectScreen: () => ({ kind: 'result', x: 0.556, y: 0.964 }),
+        pointer: { tap: async (x, y) => void taps.push([x, y]) },
+      },
+    );
+    for (; t < 10000; t += 250) bot.tick();
+    expect(taps).toEqual([]);
+    hud = false; // 真的結算頁蓋住 HUD
+    for (; t < 15000; t += 250) bot.tick();
+    expect(taps.length).toBeGreaterThan(0);
+  });
+
   it('同一個視窗點 3 次還在 → 與點擊交替按 Enter', async () => {
     let t = 0;
     const order: string[] = [];
