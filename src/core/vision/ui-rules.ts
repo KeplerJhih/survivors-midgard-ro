@@ -659,7 +659,8 @@ function topBand(f: Frame, r: Region): number[] {
 /** 大區塊（面板或直立卡片，面積 ≥ 15%）底部 25% 內、同排沒有其他按鈕、靠右半邊的最下方按鈕 */
 function cornerButton(regions: Region[], buttons: Region[]): Region | null {
   const boxes = regions
-    .filter((r) => (r.kind === 'panel' || r.kind === 'card') && rw(r) * rh(r) >= 0.15 && rw(r) < 0.8)
+    // 選地圖右側資訊面板圖示/文字多，填滿率可能剛好跌破 panel 門檻 0.45（實機 0.44）→ 放寬到 0.4
+    .filter((r) => (r.kind === 'panel' || r.kind === 'card' || r.fill >= 0.4) && rw(r) * rh(r) >= 0.15 && rw(r) < 0.8)
     .sort((a, b) => rw(b) * rh(b) - rw(a) * rh(a));
   for (const box of boxes) {
     const inBox = buttons.filter((b) => b.x0 >= box.x0 - 0.01 && b.x1 <= box.x1 + 0.01 && cy(b) > box.y0 && cy(b) <= box.y1 + 0.03);

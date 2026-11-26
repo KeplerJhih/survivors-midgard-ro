@@ -50,7 +50,9 @@ export function classify(r: Omit<Region, 'kind'>, aspect: number): RegionKind {
   // 按鈕：扁長、高度約 2.5~9% 畫面（以寬度比例換算長寬比）。
   // 小按鈕裡文字佔比高，填滿率只有 0.37~0.45（實機：任務視窗 [先不要][我來幫忙！]）→ 門檻放寬到 0.3
   const ratio = (w * aspect) / h;
-  if (r.fill >= 0.3 && h >= 0.025 && h <= 0.09 && ratio >= 1.6 && ratio <= 20 && w <= 0.7) return 'button';
+  // 視窗比 16:9 窄（直立、方形）時遊戲 UI 依寬度縮放 → 相對高度等比例變小（實機 1080×906：「選擇」高 0.024）
+  const k = Math.min(1, aspect / (16 / 9));
+  if (r.fill >= 0.3 && h >= 0.025 * k && h <= 0.09 && ratio >= 1.6 && ratio <= 20 && w <= 0.7) return 'button';
   if (r.fill < 0.45) return 'other';
   // 卡片：直立的高矩形
   if (h >= 0.3 && ratio >= 0.35 && ratio <= 0.95) return 'card';

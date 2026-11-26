@@ -8,7 +8,7 @@ const W = 640;
 const H = 448;
 
 /** 依序畫矩形（0~1 座標）：外框 1px 用 border 色，內部 fill 色；後畫的蓋前面 */
-function draw(bg: RGB, boxes: { x0: number; y0: number; x1: number; y1: number; fill: RGB; border?: RGB }[]): Frame {
+function draw(bg: RGB, boxes: { x0: number; y0: number; x1: number; y1: number; fill: RGB; border?: RGB }[], H = 448): Frame {
   const data = new Uint8ClampedArray(W * H * 4);
   for (let i = 0; i < W * H; i++) data.set([...bg, 255], i * 4);
   for (const b of boxes) {
@@ -218,6 +218,23 @@ describe('decideByLayout（結構判斷）', () => {
     const a = decide(f)!;
     expect(a.kind).toBe('map-select');
     expect(a.x).toBeCloseTo(0.645, 1);
+  });
+
+  it('窄高視窗（1080×906）選地圖：UI 依寬度縮小，右側資訊面板內容多（填滿率 0.44）→ 仍點右下「選擇」', () => {
+    const DARK: RGB = [60, 50, 40];
+    const H2 = 537;
+    const f = draw(GRASS, [
+      { x0: 0.01, y0: 0.22, x1: 0.61, y1: 0.79, fill: DARK }, // 地圖
+      { x0: 0.622, y0: 0.225, x1: 0.98, y1: 0.793, fill: PANEL }, // 資訊面板
+      { x0: 0.64, y0: 0.25, x1: 0.96, y1: 0.37, fill: DARK }, // 面板內的圖示/文字（壓低填滿率）
+      { x0: 0.64, y0: 0.4, x1: 0.96, y1: 0.55, fill: DARK },
+      { x0: 0.64, y0: 0.6, x1: 0.96, y1: 0.64, fill: DARK },
+      { x0: 0.869, y0: 0.75, x1: 0.97, y1: 0.786, fill: BTN }, // 選擇 ▶（內部高 0.024）
+    ], H2);
+    const a = decideByLayout(f, parseLayout(f))!;
+    expect(a.kind).toBe('map-select');
+    expect(a.x).toBeCloseTo(0.92, 1);
+    expect(a.y).toBeCloseTo(0.768, 1);
   });
 
   it('底部 HUD 的寬條（已保留寶箱 [開啟]）不當成寬按鈕', () => {
