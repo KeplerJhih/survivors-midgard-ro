@@ -1685,7 +1685,7 @@ describe('入口在畫面上：看名稱', () => {
     expect(bot.state.dirs).toEqual(['right', 'up']);
   });
 
-  it('看得到名稱時不理會「指示圓盤」（塔的暗色拱窗誤判）', () => {
+  it('指示圓盤優先於名稱（粉白的催眠漩渦被當成入口名稱）', () => {
     let t = 0;
     let digit = 0;
     let frozenClock = false;
@@ -1700,9 +1700,10 @@ describe('入口在畫面上：看名稱', () => {
           if (!frozenClock) digit++;
           return glyph();
         },
-        portalLabel: () => (frozenClock ? { x: 0.4, y: -0.05 } : null),
-        // 正上方的「圓盤」
-        findIndicators: () => [{ kind: 'target', x: 0, y: -0.3, icon: [40, 40, 40], size: 0.05, face: true }],
+        // 右下的「名稱」（實為催眠漩渦）
+        portalLabel: () => (frozenClock ? { x: 0.4, y: 0.3 } : null),
+        // 左邊畫面邊緣的入口指示圓盤
+        findIndicators: () => [{ kind: 'target', x: -0.75, y: -0.15, icon: [40, 40, 40], size: 0.05, face: true }],
       },
     );
     const run = (ms: number) => {
@@ -1711,8 +1712,8 @@ describe('入口在畫面上：看名稱', () => {
     run(4000);
     frozenClock = true;
     run(5000);
-    expect(bot.state.enterSrc).toBe('label');
-    expect(bot.state.dirs).toContain('right');
+    expect(bot.state.enterSrc).toBe('pointer');
+    expect(bot.state.dirs).toContain('left');
   });
 });
 
