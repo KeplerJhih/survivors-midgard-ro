@@ -139,7 +139,7 @@ const TAPS_BEFORE_ENTER = 3;
 /** 破關時免費帶回倉庫的件數（game_data.gd KEEP_WIN） */
 const KEEP_FREE = 3;
 /** 結算頁出現後等這麼久才開始帶物品（進場動畫） */
-const RESULT_SETTLE_MS = 2500;
+const RESULT_SETTLE_MS = 8000;
 /** 初始技能觸發遊戲設定同步的最短間隔（升級三張普通卡也會被判成初始技能） */
 const SYNC_REQUEST_GAP = 180000;
 const INTERVAL = { still: 1000, minimap: 400, screen: 500, portal: 250, indicator: 400, danger: 150, hp: 500, swirl: 250, object: 600, clock: 1000 };
@@ -594,14 +594,14 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // ① 格數比之前看過的都多（進場動畫還在長，實機第一下只切出 1 格、位置不對）→ 等下一張
       // ② 格數比之前看過的少（2 排物品時某些取樣只切出 1 格 → 以為帶完、直接點再玩一次）→ 等完整的那張
       // 各有上限，不卡在結算頁
-      // ③ 結算頁出現後先等 2.5 秒（進場動畫：實機第一下常點在動畫中、排序較後面的格子）
+      // ③ 結算頁出現後先等 8 秒（實機：完整物品列約 6 秒後才穩定）（進場動畫：實機第一下常點在動畫中、排序較後面的格子）
       if (act?.kind === 'result' && resultFirstAt === null) resultFirstAt = t;
       const keepPending = act?.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE;
       const keepEarly = keepPending && resultFirstAt !== null && t - resultFirstAt < RESULT_SETTLE_MS;
       const keepGrew = keepPending && keepLen > keepMaxLen;
       const keepShort = keepPending && keepLen < keepMaxLen;
-      // ④ 切出的格數少於還要帶的件數 → 多半是切割不完整，等一下（真的只有 1~2 件時最多等 3 次）
-      const keepFew = keepPending && keepLen < KEEP_FREE - keepTaken && keepFewWaits < 3;
+      // ④ 切出的格數少於還要帶的件數 → 多半是切割不完整，等一下（真的只有 1~2 件時最多等 6 次）
+      const keepFew = keepPending && keepLen < KEEP_FREE - keepTaken && keepFewWaits < 6;
       const keepUnsettled = keepEarly || keepFew || (keepGrew && keepWaits < 4) || (keepShort && keepShortWaits < 20);
       if (act?.kind === 'result') {
         if (keepGrew) keepWaits++;
