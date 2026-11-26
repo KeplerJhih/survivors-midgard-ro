@@ -710,14 +710,20 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 一般走位 / 撤退 / 風箏也會撞牆（實機：走位圖形照時間按鍵，撞牆就一直推著牆）→ 一律繞路。
       // 例外：閃避與逃離催眠師（方向不能被改）、找出口（巢穴開闊，轉 90° 反而可能擦過因果路線傳送門）
       if (activity !== 'dodge' && activity !== 'flee' && !(activity === 'enter' && exitSeek)) {
+        // 繞完之後原方向要重新試一段才算卡住：繞路本身也撞牆時，靜止 / 小地圖不動的計時從繞路前就開始，
+        // 一繞完立刻又判卡住 → 永遠不走原方向（實機：Glast Heim 樹籬迷宮，指示器在左，只上下來回）
         const stuck =
-          (stillSince !== null && t - stillSince >= STUCK_MS) || (t - mmSeenAt < 1000 && t - mmMovedAt >= MINIMAP_STUCK_MS);
+          (stillSince !== null && t - Math.max(stillSince, detourUntil) >= STUCK_MS) ||
+          (t - mmSeenAt < 1000 && t - Math.max(mmMovedAt, detourUntil) >= MINIMAP_STUCK_MS);
         if (t < detourUntil) want = detourDirs;
         else if (stuck && want.length) {
           mmMovedAt = t;
-          // 連續卡住（上次繞完 10 秒內）→ 換邊且繞更久（2 → 4 → 6 秒），長牆也繞得出去
-          detourStreak = t - detourUntil < 10000 ? Math.min(4, detourStreak + 1) : 1;
-          detourCw = !detourCw;
+          // 連續卡住（上次繞完 10 秒內）→ 同一側繞更久（0.9 → 1.8 → 2.7 → 3.6 秒，沿牆走），到頂才換邊；
+          // 每次換邊會把前一段繞的路走回去（上下來回原地打轉）
+          const cont = t - detourUntil < 10000;
+          detourStreak = cont ? detourStreak + 1 : 1;
+          if (detourStreak > 4) detourStreak = 1;
+          if (detourStreak === 1) detourCw = !detourCw;
           detourDirs = want.map((d) => TURN[detourCw ? 'cw' : 'ccw'][d]);
           detourUntil = t + DETOUR_MS * detourStreak;
           log?.info('enter: 卡住，往側邊繞', detourDirs);

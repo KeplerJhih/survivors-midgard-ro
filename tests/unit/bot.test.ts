@@ -427,6 +427,47 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
 });
 
 describe('走向傳送門撞牆', () => {
+  it('繞路也撞牆（樹籬迷宮）→ 每段繞完仍會回頭試原方向，且連續卡住時同一側越繞越久、不上下來回', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    let moving = true;
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => null,
+        pointer: { tap: async () => {} },
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        approachSwirl: () => ['left'],
+        stillFrame: () => ({ width: 4, height: 4, data: new Uint8ClampedArray(64).fill(moving ? (Math.floor(t / 1000) % 2 ? 0 : 200) : 50) }),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(5000);
+    frozenClock = true;
+    run(6000);
+    expect(bot.state.dirs).toEqual(['left']);
+    moving = false; // 原方向與繞路方向全都撞牆
+    const seq: string[] = [];
+    for (let e = 0; e < 12000; e += 250) (t += 250), bot.tick(), seq.push(bot.state.dirs.join(''));
+    // 每段繞路之間都有回到原方向（左）
+    const runs = seq.reduce<string[]>((a, d) => (a.at(-1) === d ? a : [...a, d]), []);
+    for (let i = 1; i < runs.length - 1; i++) if (runs[i] !== 'left') expect([runs[i - 1], runs[i + 1]]).toContain('left');
+    // 前幾段繞路都在同一側
+    const detours = runs.filter((d) => d !== 'left');
+    expect(detours.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(detours.slice(0, 3)).size).toBe(1);
+  });
+
   it('時間停住、走向入口光時畫面靜止 → 轉 90° 繞路；入口開著時不按 Enter', () => {
     let t = 0;
     let digit = 0;
@@ -461,9 +502,9 @@ describe('走向傳送門撞牆', () => {
     expect(bot.state.activity).toBe('enter');
     expect(bot.state.dirs).toEqual(['up']);
     moving = false; // 撞牆
-    run(4000);
-    expect(bot.state.dirs).not.toEqual(['up']);
-    expect(['left', 'right']).toContain(bot.state.dirs[0]);
+    const seen: string[] = [];
+    for (let e = 0; e < 4000; e += 250) (t += 250), bot.tick(), seen.push(bot.state.dirs.join(''));
+    expect(seen.some((d) => d === 'left' || d === 'right')).toBe(true);
     run(8000);
     expect(sent).not.toContain('Enter');
   });
