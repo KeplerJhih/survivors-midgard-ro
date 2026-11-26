@@ -31,12 +31,30 @@ export function findPortalLabel(f: Frame): { x: number; y: number } | null {
   const { width: W, height: H, data } = f;
   const hit = new Uint8Array(W * H);
   let any = 0;
+  // 筆畫旁 3px 內一定有黑外框。實機 Niflheim：淡紫碎石地面 (209,195,210) 比例也符合 →
+  // 與名稱連成一大塊、高度超過一行字被丟掉（外掛在催眠師旁打轉，找不到畫面下緣的入口）
+  const R = 3;
+  const dark = (x: number, y: number) => {
+    const i = (y * W + x) * 4;
+    return data[i]! + data[i + 1]! + data[i + 2]! < 180;
+  };
+  const nearDark = (x: number, y: number) => {
+    for (let d = 1; d <= R; d++)
+      if (
+        (x - d >= 0 && dark(x - d, y)) ||
+        (x + d < W && dark(x + d, y)) ||
+        (y - d >= 0 && dark(x, y - d)) ||
+        (y + d < H && dark(x, y + d))
+      )
+        return true;
+    return false;
+  };
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const fx = x / W, fy = y / H;
       if (HUD.some((z) => fx >= z.x0 && fx <= z.x1 && fy >= z.y0 && fy <= z.y1)) continue;
       const i = (y * W + x) * 4;
-      if (isPortalLabel(data[i]!, data[i + 1]!, data[i + 2]!)) {
+      if (isPortalLabel(data[i]!, data[i + 1]!, data[i + 2]!) && nearDark(x, y)) {
         hit[y * W + x] = 1;
         any++;
       }

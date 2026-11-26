@@ -43,4 +43,15 @@ describe('findPortalLabel（MVP 入口 / 出口名稱）', () => {
     expect(findPortalLabel(frame((set) => text(set, 400, 55, 8, [255, 255, 255])))).toBeNull();
     expect(findPortalLabel(frame((set) => text(set, 400, 55, 8, [255, 235, 170])))).toBeNull();
   });
+  it('旁邊是比例相同的淡紫地面（Niflheim 碎石）→ 不跟地面連成一塊，名稱仍找得到', () => {
+    // 實機：地面 (209,195,210) 也符合比例 → 與名稱連成一大塊、高度超過一行字 → 被丟掉，外掛在催眠師旁打轉
+    const f = frame((set) => {
+      for (let y = 40; y < 120; y++) for (let x = 380; x < 480; x++) if ((x + y) % 3 === 0) set(x, y, [209, 195, 210]);
+      text(set, 400, 60, 8, [255, 229, 255]);
+    });
+    const p = findPortalLabel(f)!;
+    expect(p).not.toBeNull();
+    // 緊貼外框的地面像素會被算進來、底部略往下（差幾 px），方向正確即可
+    expect(p.y).toBeCloseTo(67 / H - 0.5 + 0.06, 1);
+  });
 });
