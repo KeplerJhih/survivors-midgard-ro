@@ -215,7 +215,7 @@ describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () 
     const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
     const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
     const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, karmaRoute: 'none', mode: 'circle' },
+      { ...DEFAULT_SETTINGS.bot, enabled: true, niflheimRoute: false, mode: 'circle' },
       {
         keyboard,
         now: () => t,
@@ -390,7 +390,7 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
     target.addEventListener('keydown', (e) => sent.push((e as KeyboardEvent).code));
     const keyboard = createKeyboard(target, { sleep: async () => {} });
     const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, karmaRoute: 'none' },
+      { ...DEFAULT_SETTINGS.bot, enabled: true, niflheimRoute: false },
       { keyboard, now: () => t, detectScreen: () => ({ kind: 'corrupt', x: 0.7, y: 0.8 }), pointer: { tap: async () => {} } },
     );
     for (; t < 20000; t += 250) bot.tick();
@@ -863,7 +863,7 @@ describe('入口開著、畫面上找不到入口（暗色地圖）', () => {
 });
 
 describe('因果路線傳送門（打完 MVP 後走 Niflheim）', () => {
-  const win = (karmaRoute: 'none' | 'niflheim', red: boolean) => {
+  const win = (niflheimRoute: boolean, red: boolean) => {
     let t = 0;
     let digit = 0;
     let frozenClock = false;
@@ -871,7 +871,7 @@ describe('因果路線傳送門（打完 MVP 後走 Niflheim）', () => {
     const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
     const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
     const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle', karmaRoute },
+      { ...DEFAULT_SETTINGS.bot, enabled: true, mode: 'circle', niflheimRoute },
       {
         keyboard,
         now: () => t,
@@ -900,18 +900,18 @@ describe('因果路線傳送門（打完 MVP 後走 Niflheim）', () => {
   };
 
   it('設定 Niflheim、看得到紅色傳送門 → 走向它，不走出口', () => {
-    const { bot } = win('niflheim', true);
+    const { bot } = win(true, true);
     expect(bot.state.activity).toBe('enter');
     expect(bot.state.dirs).toEqual(['left']);
   });
 
   it('設定不走路線 → 照舊走出口（紅色傳送門不理）', () => {
-    const { bot } = win('none', true);
+    const { bot } = win(false, true);
     expect(bot.state.dirs).toEqual(['right']);
   });
 
   it('設定 Niflheim 但沒有紅色傳送門（沒開過腐化寶箱）→ 等一下確認後走出口', () => {
-    const { bot, run } = win('niflheim', false);
+    const { bot, run } = win(true, false);
     expect(bot.state.dirs).toEqual([]); // 出口已在畫面上、還沒看到紅門 → 先原地等
     run(5000);
     expect(bot.state.dirs).toEqual(['right']);
@@ -1043,7 +1043,7 @@ describe('勝利後出口光時有時無', () => {
     const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
     const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
     const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, karmaRoute: 'none', mode: 'circle' },
+      { ...DEFAULT_SETTINGS.bot, enabled: true, niflheimRoute: false, mode: 'circle' },
       {
         keyboard,
         now: () => t,
@@ -1480,7 +1480,7 @@ describe('巢穴：時鐘剛停住首領就出現（載入後立刻開打）', (
     const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
     const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
     const bot = createBot(
-      { ...DEFAULT_SETTINGS.bot, enabled: true, karmaRoute: 'none' },
+      { ...DEFAULT_SETTINGS.bot, enabled: true, niflheimRoute: false },
       {
         keyboard,
         now: () => t,
