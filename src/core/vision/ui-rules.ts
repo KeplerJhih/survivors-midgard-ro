@@ -83,7 +83,8 @@ export function decideByLayout(
 /** 置中小面板（面積 8~35%）內有 ≥ 12 個近正方形小格（倉庫物品）→ 回傳［取消］的位置（右下兩顆按鈕的左邊那顆） */
 function storagePicker(regions: Region[], aspect: number): { x: number; y: number } | null {
   const panel = regions.find(
-    (p) => (p.kind === 'panel' || p.kind === 'card') && rw(p) * rh(p) >= 0.08 && rw(p) * rh(p) <= 0.35 && Math.abs(cx(p) - 0.5) < 0.1,
+    // 面板裡塞滿物品格，填滿率低 → 常被歸為 other（實機 fill 0.23）
+    (p) => (p.kind === 'panel' || p.kind === 'card' || p.kind === 'other') && rw(p) * rh(p) >= 0.08 && rw(p) * rh(p) <= 0.35 && Math.abs(cx(p) - 0.5) < 0.1,
   );
   if (!panel) return null;
   const tiles = regions.filter((r) => {
