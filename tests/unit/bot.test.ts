@@ -1222,6 +1222,28 @@ describe('帶回物品：某些取樣格數變少', () => {
   });
 });
 
+describe('帶回物品：結算頁出現後先等', () => {
+  it('結算頁出現 2.5 秒內不點物品格（進場動畫）', () => {
+    let t = 0;
+    const taps: number[] = [];
+    const store = { v: true };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () => ({ kind: 'result', x: 0.47, y: 0.94, keep: [0.3, 0.34, 0.38].map((x) => ({ x, y: 0.75 })) }),
+        pointer: { tap: async () => void taps.push(t) },
+      },
+    );
+    for (t = 1000; t < 20000; t += 250) bot.tick();
+    expect(taps.length).toBeGreaterThan(0);
+    expect(taps[0]! - 1000).toBeGreaterThanOrEqual(2500);
+  });
+});
+
 describe('一般走位撞牆', () => {
   it('按著方向鍵小地圖位置 2 秒沒動 → 轉 90° 繞路', () => {
     let t = 0;
