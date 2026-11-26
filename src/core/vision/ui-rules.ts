@@ -80,6 +80,26 @@ export function decideByLayout(
   return { ...act, keep, keepTabs: keepTabs(regions, found) };
 }
 
+/** 置中小面板（面積 8~35%）內有 ≥ 12 個近正方形小格（倉庫物品）→ 回傳［取消］的位置（右下兩顆按鈕的左邊那顆） */
+function storagePicker(regions: Region[], aspect: number): { x: number; y: number } | null {
+  const panel = regions.find(
+    (p) => (p.kind === 'panel' || p.kind === 'card') && rw(p) * rh(p) >= 0.08 && rw(p) * rh(p) <= 0.35 && Math.abs(cx(p) - 0.5) < 0.1,
+  );
+  if (!panel) return null;
+  const tiles = regions.filter((r) => {
+    if (r === panel || !inside(r, panel, 0.005)) return false;
+    const ratio = (rw(r) * aspect) / rh(r);
+    return rw(r) >= 0.02 && rw(r) <= 0.08 && ratio >= 0.7 && ratio <= 1.4;
+  });
+  if (tiles.length < 12) return null;
+  const btns = regions
+    .filter((r) => r.kind === 'button' && inside(r, panel, 0.005) && cy(r) > panel.y1 - 0.15 * rh(panel) && cx(r) > cx(panel))
+    .sort((a, b) => a.x0 - b.x0);
+  if (btns.length >= 2) return { x: cx(btns[btns.length - 2]!), y: cy(btns[btns.length - 2]!) };
+  // 按鈕切不出來：實機［取消］約在面板右緣往內 21% 寬、底緣往上 5% 高
+  return { x: panel.x1 - 0.21 * rw(panel), y: panel.y1 - 0.05 * rh(panel) };
+}
+
 /**
  * 物品格常有一部分切不出來（相鄰格、角標黏在一起；實機 17 格只切出中間 5 格 → 點到中間、評分最高的左邊幾格沒帶）。
  * 用切出的格距往左一格一格推：那格的亮度起伏夠大（有物品圖示）就補上，碰到平坦的面板底色就停。
@@ -202,6 +222,11 @@ function decideCore(
   const panels = regions.filter((r) => r.kind === 'panel');
   const cards = regions.filter((r) => r.kind === 'card');
 
+  // ---- 倉庫已滿：結算頁帶物品時跳出「選擇要替換掉的倉庫物品」（置中小面板裡一大格倉庫物品＋右下［取消］［確認存入］）----
+  // 不替換倉庫裡的東西 → 點取消，之後不再帶（實機：倉庫 80/80，外掛停在這個視窗不動）
+  const picker = storagePicker(regions, f.width / f.height);
+  if (picker) return { kind: 'storage-full', ...picker };
+
   // ---- 腐化寶箱：兩個大小相同、並排、各含一顆按鈕的區塊（卡片偏方，會被歸為 panel 或 card）----
   const boxes = regions.filter((r) => (r.kind === 'panel' || r.kind === 'card') && rw(r) < 0.6 && rh(r) >= 0.2);
   for (const pair of rows(boxes, 0.03, 0.05)) {
@@ -306,7 +331,9 @@ function decideCore(
     // [重新選擇][仍要離開]，焦點在左邊重新選擇（ui/menus.gd back.grab_focus）；原本固定點右邊 → 裝備全丟、回城
     if (p && !isWide(p)) {
       const focused = bottom.filter((b) => hasFocusFrame(f, b));
-      return tap('dialog', focused.length === 1 ? focused[0]! : bottom[1]!);
+      const pick = focused.length === 1 ? focused[0]! : bottom[1]!;
+      const other = bottom.find((b) => b !== pick)!;
+      return { ...tap('dialog', pick), alt: { x: cx(other), y: cy(other) } };
     }
   }
   // 小面板內上下疊兩顆等寬的寬按鈕（MVP 勝利「繼續無盡模式／結束本局」）→ 點上面那顆（遊戲預設焦點、主要選項）

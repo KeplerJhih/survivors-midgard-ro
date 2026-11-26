@@ -1271,6 +1271,41 @@ describe('帶回物品：依位置挑最左邊沒點過的格子', () => {
   });
 });
 
+describe('倉庫已滿', () => {
+  it('跳出替換視窗 → 點取消、不再帶；「不存放就離開？」點仍要離開', () => {
+    let t = 0;
+    let stage: 'result' | 'picker' | 'confirm' = 'result';
+    const taps: string[] = [];
+    const store = { v: true };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () =>
+          stage === 'picker'
+            ? { kind: 'storage-full', x: 0.6, y: 0.68 }
+            : stage === 'confirm'
+              ? { kind: 'dialog', x: 0.45, y: 0.53, alt: { x: 0.6, y: 0.53 } }
+              : { kind: 'result', x: 0.47, y: 0.94, keep: [0.3, 0.34, 0.38].map((x) => ({ x, y: 0.75 })) },
+        pointer: {
+          tap: async (x) => {
+            taps.push(`${x}`);
+            if (stage === 'result' && x === 0.3) stage = 'picker';
+            else if (stage === 'picker' && x === 0.6) stage = 'result';
+            else if (stage === 'result' && x === 0.47) stage = 'confirm';
+          },
+        },
+      },
+    );
+    for (; t < 40000; t += 250) bot.tick();
+    // 帶第 1 件 → 替換視窗點取消 → 不再帶 → 再玩一次 →「不存放就離開？」點仍要離開
+    expect(taps.slice(0, 4)).toEqual(['0.3', '0.6', '0.47', '0.6']);
+  });
+});
+
 describe('一般走位撞牆', () => {
   it('按著方向鍵小地圖位置 2 秒沒動 → 轉 90° 繞路', () => {
     let t = 0;

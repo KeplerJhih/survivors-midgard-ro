@@ -19,7 +19,7 @@ import type { Frame } from './frame';
  * - 「新卡片！」等置中視窗：淺色面板（實機約畫面 37%×61%，密度 0.72），底部「繼續」為主要按鈕（藍框，
  *   縮圖後只剩上緣一條線）；背景不壓暗。升級選卡視窗不使用 UiKit 主要按鈕，不會被誤點
  */
-export type ScreenKind = 'result' | 'corrupt' | 'level-up' | 'map-select' | 'modal' | 'dialog' | 'start-skill' | 'pause' | 'job';
+export type ScreenKind = 'result' | 'corrupt' | 'level-up' | 'map-select' | 'modal' | 'dialog' | 'start-skill' | 'pause' | 'job' | 'storage-full';
 
 /** 稀有度由高到低（進化 > 傳說 > 史詩 > 稀有） */
 export const RARITY_BORDERS: { name: string; rgb: [number, number, number] }[] = [
@@ -38,6 +38,8 @@ export interface ScreenAction {
   keep?: { x: number; y: number }[];
   /** 物品格上方的稀有度分頁（由左到右：傳說、紫色、其餘；停用的切不出來），pressed＝目前分頁 */
   keepTabs?: { x: number; y: number; pressed: boolean }[];
+  /** 兩顆按鈕的確認框：另一顆（倉庫已滿時「不存放就離開？」要點的「仍要離開」） */
+  alt?: { x: number; y: number };
 }
 
 const isLight = (r: number, g: number, b: number) =>

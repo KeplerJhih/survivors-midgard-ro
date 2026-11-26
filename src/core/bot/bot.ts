@@ -199,6 +199,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let resultFirstAt: number | null = null;
   let resultSeenAt = -Infinity;
   let resultLeftPending = false;
+  let storageFull = false;
   const keepTabTried = new Set<number>();
   const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
     const tabs = act.keepTabs ?? [];
@@ -307,6 +308,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           keepShortWaits = 0;
           keepWaits = 0;
           resultFirstAt = null;
+          storageFull = false;
           keepFewWaits = 0;
           keepTappedX.length = 0;
           keepTabTried.clear();
@@ -636,6 +638,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 破關（打倒過 MVP）的結算頁：先免費帶 3 件回 Kafra 倉庫（不帶就離開會被賣掉），再點再玩一次。
         // 每格只點一次（再點一次＝取消保存）
         // 只顯示目前稀有度分頁（傳說 > 紫色 > 其餘，預設停在最高的）；這頁不足 3 件 → 切到右邊下一頁繼續
+        // 倉庫已滿：點取消後不再帶（再帶也只會一直跳替換視窗）
+        if (act.kind === 'storage-full') (keepTaken = KEEP_FREE), (storageFull = true);
         const keepStep = act.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE ? nextKeep(act) : null;
         state.acts = [
           ...state.acts.slice(-9),
@@ -656,8 +660,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           log?.info('screen: 點擊無效，改按 Enter', act);
           void keyboard.tap('enter');
         } else {
-          log?.info('screen: 點擊', act);
-          void pointer.tap(act.x, act.y);
+          // 倉庫已滿、結算頁按了離開 →「不存放就離開？」點「仍要離開」（預設焦點是重新選擇，會一直退回結算頁）
+          const target = act.kind === 'dialog' && storageFull && resultLeftPending && act.alt ? act.alt : act;
+          log?.info('screen: 點擊', act, target === act ? '' : '（倉庫已滿：仍要離開）');
+          void pointer.tap(target.x, target.y);
           // 點了結算頁的按鈕不代表離開：沒帶滿 3 件會跳「不存放就離開？」、Enter 退回結算頁
           // （實機：在這裡就清掉「打倒過 MVP」→ 剩下 2 件不再帶、一直點再玩一次原地打轉）
           // → 等下一局 HP 條出現才重設（見 vitals）

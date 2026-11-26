@@ -92,6 +92,21 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeGreaterThan(0.6);
   });
 
+  it('倉庫已滿的替換視窗（小面板內一大格物品＋右下兩顆按鈕）→ 點左邊的取消', () => {
+    const boxes: { x0: number; y0: number; x1: number; y1: number; fill: RGB; border?: RGB }[] = [
+      { x0: 0.31, y0: 0.29, x1: 0.69, y1: 0.7, fill: PANEL },
+    ];
+    for (let r = 0; r < 3; r++)
+      for (let c = 0; c < 6; c++)
+        boxes.push({ x0: 0.33 + c * 0.05, y0: 0.35 + r * 0.09, x1: 0.33 + c * 0.05 + 0.04, y1: 0.35 + r * 0.09 + 0.065, fill: [200, 180, 220], border: [150, 120, 190] });
+    boxes.push({ x0: 0.585, y0: 0.645, x1: 0.625, y1: 0.69, fill: BTN });
+    boxes.push({ x0: 0.635, y0: 0.645, x1: 0.68, y1: 0.69, fill: BTN });
+    const a = decide(draw([40, 50, 40], boxes))!;
+    expect(a.kind).toBe('storage-full');
+    expect(a.x).toBeLessThan(0.63);
+    expect(a.y).toBeGreaterThan(0.6);
+  });
+
   it('結算頁三塊面板（中、右各有一顆按鈕在中段）不是腐化寶箱', () => {
     const f = draw(GRASS, [
       { x0: 0.06, y0: 0.1, x1: 0.94, y1: 0.95, fill: PANEL },
