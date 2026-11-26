@@ -84,7 +84,8 @@ export default defineContentScript({
         const legacy = detectScreen(frame);
         // 舊顏色規則的腐化寶箱：真的寶箱要點的是卡片底部的按鈕（畫面下半部）；結算頁的「致命的敵人」粉紅框＋藍色元素
         // 也會成立，點的位置落在中間（實機 0.78,0.50＝傷害報告「查看詳情」）→ 只收下半部的
-        if (legacy?.kind === 'corrupt') return legacy.y >= 0.6 ? legacy : null;
+        // Valhalla 一定是右卡 → x 也要在右半（實機點到兩卡之間 0.506，沒選到）
+        if (legacy?.kind === 'corrupt') return legacy.y >= 0.6 && legacy.x >= 0.55 ? legacy : null;
         return legacy?.kind === 'result' ? legacy : null;
       },
       findIndicators: () => {

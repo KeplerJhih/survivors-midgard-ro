@@ -164,7 +164,8 @@ function decideCore(
     if (Math.abs(rw(a) - rw(b)) > 0.03) continue;
     const btnA = buttons.find((x) => inside(x, a, 0.01));
     const btnB = buttons.find((x) => inside(x, b, 0.01));
-    if (btnA && btnB) return tap('corrupt', btnB);
+    // 點右卡（Valhalla）的水平中心：按鈕在卡片內置中。實機切出的按鈕有時連到左卡 → 中心落在兩卡之間（0.506）沒點到
+    if (btnA && btnB) return { kind: 'corrupt', x: cx(b), y: cy(btnB) };
   }
 
   // ---- 轉職（Base Lv 20）----
