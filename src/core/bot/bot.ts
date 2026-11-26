@@ -46,6 +46,8 @@ export interface BotState {
   runner: boolean;
   /** 入口開著時走向的來源（除錯用） */
   enterSrc: string;
+  /** 最近 10 次視窗處理（除錯用：辨識成什麼、點哪裡、怎麼點） */
+  acts: { t: number; kind: string; x: number; y: number; keep: number; how: string }[];
 }
 
 export interface Bot {
@@ -231,6 +233,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     altars: [],
     runner: false,
     enterSrc: '-',
+    acts: [],
   };
 
   // ---- 感知（節流）----
@@ -481,6 +484,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 每格只點一次（再點一次＝取消保存）
         // 只顯示目前稀有度分頁（傳說 > 紫色 > 其餘，預設停在最高的）；這頁不足 3 件 → 切到右邊下一頁繼續
         const keepStep = act.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE ? nextKeep(act) : null;
+        state.acts = [
+          ...state.acts.slice(-9),
+          {
+            t,
+            kind: act.kind,
+            x: +act.x.toFixed(3),
+            y: +act.y.toFixed(3),
+            keep: act.keep?.length ?? 0,
+            how: keepStep ? `keep:${keepStep.what}` : enter ? 'enter' : 'tap',
+          },
+        ];
         if (keepStep) {
           log?.info('result: 帶回倉庫', keepStep.what, keepTaken);
           void pointer.tap(keepStep.x, keepStep.y);
