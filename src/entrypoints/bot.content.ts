@@ -84,7 +84,8 @@ export default defineContentScript({
         return legacy && (legacy.kind === 'result' || legacy.kind === 'corrupt') ? legacy : null;
       },
       findIndicators: () => {
-        const frame = sampleHi();
+        // 640 寬：圓盤下方的距離數字（字級 11）在 320 寬只剩 1~2px、與背景混色
+        const frame = sampleUI();
         return frame ? findIndicators(frame) : null;
       },
       probeDanger: () => {

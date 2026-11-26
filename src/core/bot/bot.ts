@@ -328,7 +328,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       INTERVAL.indicator,
       () => {
         if (!config.seekTargets || !deps.findIndicators) return null;
-        const list = deps.findIndicators();
+        // 頭像圓盤只在入口開著 / 找出口時由 pointer 處理；一般走位不追（陰影旁剛好有白色東西會誤判）
+        const list = deps.findIndicators()?.filter((i) => !i.face) ?? null;
         return targetSeeker.update(list && resolvePurple(list, state.frozen), now());
       },
       null as Dir[] | null,

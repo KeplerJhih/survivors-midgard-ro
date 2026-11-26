@@ -23,6 +23,8 @@ export interface Indicator {
   icon: [number, number, number];
   /** 圓盤直徑 / 畫面高度 */
   size: number;
+  /** 只靠「下方有距離數字」認出的頭像圓盤（MVP 入口 / 出口；一般戰鬥中不追，避免陰影＋白字誤判） */
+  face?: boolean;
 }
 
 /** 大於此直徑（/H）視為大圓盤：傳送門或任務 */
@@ -107,8 +109,13 @@ export function findIndicators(f: Frame): Indicator[] {
         k++;
       }
     }
-    if (k < 2) continue;
     const size = (w + h) / 2 / H;
+    // 沒有亮色圖示：一般是陰影；但 MVP 頭像可能整個偏暗（實機 Dark Lord）→ 下方有距離數字的仍算入口圓盤
+    if (k < 2) {
+      if (!hasDistanceText(f, sx / n, sy / n, size * H)) continue;
+      out.push({ kind: 'target', x: (sx / n - W / 2) / H, y: (sy / n - H / 2) / H, icon: [0, 0, 0], size: Math.max(size, LARGE_DISC), face: true });
+      continue;
+    }
     const icon: [number, number, number] = [Math.round(r / k), Math.round(g / k), Math.round(b / k)];
     const cls = classifyIcon(...icon);
     // 綠/灰圖示：陰影、樹影等（實機誤判 icon≈(157,162,74)）。
@@ -124,7 +131,14 @@ export function findIndicators(f: Frame): Indicator[] {
     }
     // 大圓盤（傳送門/任務）一律前往，紫色的大圓盤是 Baphomet 等 MVP 入口
     const kind = size >= LARGE_DISC || portalFace ? 'target' : cls;
-    out.push({ kind, x: (sx / n - W / 2) / H, y: (sy / n - H / 2) / H, icon, size: portalFace ? Math.max(size, LARGE_DISC) : size });
+    out.push({
+      kind,
+      x: (sx / n - W / 2) / H,
+      y: (sy / n - H / 2) / H,
+      icon,
+      size: portalFace ? Math.max(size, LARGE_DISC) : size,
+      ...(portalFace ? { face: true } : {}),
+    });
   }
   return out;
 }

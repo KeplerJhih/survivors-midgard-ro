@@ -68,6 +68,12 @@ describe('findIndicators', () => {
     expect(p!.size).toBeGreaterThanOrEqual(0.044); // 當成傳送門大圓盤（頭像把圓盤切碎，量到的偏小）
   });
 
+  it('頭像整個偏暗（沒有亮色圖示）但下方有距離數字 → 仍是入口圓盤', () => {
+    const f = frame([{ cx: 100, cy: 70, d: 9, icon: [30, 34, 28] }]);
+    for (let y = 77; y <= 80; y++) for (let x = 98; x <= 102; x++) (f.data as Uint8ClampedArray).set([255, 255, 255, 255], (y * W + x) * 4);
+    expect(findIndicators(f)[0]!.kind).toBe('target');
+  });
+
   it('同樣的圓盤下方沒有白字（樹影）→ 不算', () => {
     expect(findIndicators(frame([{ cx: 100, cy: 70, d: 9, icon: [230, 170, 200] }]))).toEqual([]);
   });
