@@ -197,6 +197,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let keepFewWaits = 0;
   const keepTappedX: number[] = [];
   let resultFirstAt: number | null = null;
+  let resultSeenAt = -Infinity;
   let resultLeftPending = false;
   const keepTabTried = new Set<number>();
   const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
@@ -595,7 +596,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // ② 格數比之前看過的少（2 排物品時某些取樣只切出 1 格 → 以為帶完、直接點再玩一次）→ 等完整的那張
       // 各有上限，不卡在結算頁
       // ③ 結算頁出現後先等 8 秒（實機：完整物品列約 6 秒後才穩定）（進場動畫：實機第一下常點在動畫中、排序較後面的格子）
-      if (act?.kind === 'result' && resultFirstAt === null) resultFirstAt = t;
+      // 「出現時間」以這次連續看到結算頁起算：超過 10 秒沒看到＝新的結算頁（實機：重載 / 手動處理後殘留舊值 → 沒等就點）
+      if (act?.kind === 'result') {
+        if (resultFirstAt === null || t - resultSeenAt > 10000) resultFirstAt = t;
+        resultSeenAt = t;
+      }
       const keepPending = act?.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE;
       const keepEarly = keepPending && resultFirstAt !== null && t - resultFirstAt < RESULT_SETTLE_MS;
       const keepGrew = keepPending && keepLen > keepMaxLen;
