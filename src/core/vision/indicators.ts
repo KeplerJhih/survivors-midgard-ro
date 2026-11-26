@@ -27,6 +27,8 @@ export interface Indicator {
 
 /** 大於此直徑（/H）視為大圓盤：傳送門或任務 */
 export const LARGE_DISC = 0.044;
+/** 傳送門圓盤（半徑 24 → 直徑約 0.067H）；樹影等雜訊最大約 0.055H（實機） */
+export const PORTAL_DISC = 0.06;
 
 /** 不在這些區域找（0~1）：左上資訊、右上小地圖與任務/傷害面板、底部技能列、兩側觸控搖桿與按鈕 */
 export const HUD_ZONES = [
@@ -97,10 +99,13 @@ export function findIndicators(f: Frame): Indicator[] {
       }
     }
     if (k < 2) continue;
-    const icon: [number, number, number] = [Math.round(r / k), Math.round(g / k), Math.round(b / k)];
     const size = (w + h) / 2 / H;
+    const icon: [number, number, number] = [Math.round(r / k), Math.round(g / k), Math.round(b / k)];
     const cls = classifyIcon(...icon);
-    if (cls === 'other') continue; // 綠/灰圖示：陰影、樹影等（實機誤判 icon≈(157,162,74)）
+    // 綠/灰圖示：陰影、樹影等（實機誤判 icon≈(157,162,74)）。
+    // 例外：MVP 入口 / 出口圓盤（ui/chest_pointer.gd 半徑 24，比寶箱 19 大）中間是 MVP 頭像，顏色各不相同
+    // （實機：Dark Lord 頭像被歸為 other → 入口指示器被丟掉，在畫面外的入口找不到）→ 夠大的就不看圖示顏色
+    if (cls === 'other' && size < PORTAL_DISC) continue;
     // 大圓盤（傳送門/任務）一律前往，紫色的大圓盤是 Baphomet 等 MVP 入口
     const kind = size >= LARGE_DISC ? 'target' : cls;
     out.push({ kind, x: (sx / n - W / 2) / H, y: (sy / n - H / 2) / H, icon, size });

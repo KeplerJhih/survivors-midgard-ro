@@ -60,6 +60,12 @@ describe('findIndicators', () => {
     expect(findIndicators(frame([{ cx: 100, cy: 60, d: 12, icon: [157, 162, 74] }]))).toEqual([]);
   });
 
+  it('傳送門大小的圓盤（半徑 24）中間是 MVP 頭像（顏色歸為 other，如 Dark Lord）仍當目標', () => {
+    const [p] = findIndicators(frame([{ cx: 100, cy: 70, d: 15, icon: [230, 170, 200] }]));
+    expect(p!.kind).toBe('target');
+    expect(p!.size).toBeGreaterThanOrEqual(0.06);
+  });
+
   it('HUD 區域（右下觸控按鈕）的深色圓不算', () => {
     expect(findIndicators(frame([{ cx: 0.8 * W, cy: 0.8 * H, icon: GOLD }]))).toEqual([]);
   });
