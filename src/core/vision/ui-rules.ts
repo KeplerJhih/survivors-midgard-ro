@@ -264,8 +264,13 @@ function decideCore(
   if (dlg) {
     // 對話框內有焦點藍框按鈕（Godot 預設焦點＝主要動作）→ 點它。實機首領寶箱 [全部販賣 (F)][繼續]：
     // 右下角是空白，每次點兩下沒反應才靠 Enter 備援
-    const focus = focusedButton(f, regions);
-    if (focus && focus.x >= dlg.x0 && focus.x <= dlg.x1 && focus.y >= dlg.y0 && focus.y <= dlg.y1) return { kind: 'dialog', ...focus };
+    // 小對話框（勝利選擇 [以無盡模式繼續 (焦點)][結束本局]，面積 < 0.15）也要找 → 直接在對話框內找。
+    // 實機：點右下角落在兩顆之間 → 結束了本局
+    // 先看切得出來的按鈕外框有沒有焦點藍框；再在對話框下半部直接找藍框（上半部是標題列，實機有藍色誤判）
+    const fb = buttons.filter((b) => inside(b, dlg, 0.01) && hasFocusFrame(f, b));
+    if (fb.length === 1) return tap('dialog', fb[0]!);
+    const focus = focusedButtonIn(f, dlg, 0.5);
+    if (focus) return { kind: 'dialog', ...focus };
     return { kind: 'dialog', x: dlg.x0 + 0.9 * rw(dlg), y: dlg.y0 + 0.8 * rh(dlg) };
   }
 
@@ -342,10 +347,14 @@ function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | 
     // 寬 < 0.95：視窗不會貼滿左右兩側；實機 MVP 巢穴淺色石板地被切成滿版面板 → 把技能列藍框當「繼續」一直點
     (r) => (r.kind === 'panel' || r.kind === 'card') && Math.abs(cx(r) - 0.5) < 0.06 && rw(r) < 0.95 && rw(r) * rh(r) >= 0.15 && r.fill >= 0.5,
   );
-  if (!box) return null;
+  return box ? focusedButtonIn(f, box, 0.25) : null;
+}
+
+/** 在 box 底部 bottomFrac 範圍內找焦點藍框按鈕（取最下排、同排取最右） */
+function focusedButtonIn(f: Frame, box: Region, bottomFrac: number): { x: number; y: number } | null {
   const { width: W, height: H, data } = f;
   const x0 = Math.round(box.x0 * W), x1 = Math.round(box.x1 * W);
-  const y0 = Math.round((box.y1 - 0.25 * rh(box)) * H), y1 = Math.min(H, Math.round(box.y1 * H));
+  const y0 = Math.round((box.y1 - bottomFrac * rh(box)) * H), y1 = Math.min(H, Math.round(box.y1 * H));
   const ok = new Uint8Array(W * H);
   for (let y = y0; y < y1; y++)
     for (let x = x0; x < x1; x++) {
@@ -378,7 +387,8 @@ function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | 
     }
     const w = (mxx - mnx + 1) / W, h = (mxy - mny + 1) / H;
     const perimeter = 2 * (mxx - mnx + mxy - mny + 2);
-    if (w < 0.02 || w > 0.25 || h < 0.015 || h > 0.1 || n < perimeter * 0.3) continue;
+    // 寬到 0.4：勝利選擇的「以無盡模式繼續」寬 0.27W（實機）
+    if (w < 0.02 || w > 0.4 || h < 0.015 || h > 0.1 || n < perimeter * 0.3) continue;
     const c = { x: (mnx + mxx + 1) / 2 / W, y: (mny + mxy + 1) / 2 / H };
     // 取最下面一排；同一排有好幾個藍框時取最右邊（遊戲對話框的主要動作放最後，如寶箱「繼續」在「全部販賣」右邊）
     if (!best || c.y > best.y + 0.02 || (Math.abs(c.y - best.y) <= 0.02 && c.x > best.x)) best = c;

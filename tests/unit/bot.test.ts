@@ -1335,6 +1335,53 @@ describe('原地圖首領戰中時鐘停住（寶箱視窗）', () => {
   });
 });
 
+describe('進巢穴的載入畫面', () => {
+  it('載入中讀不到時鐘（停住判定短暫解除）→ 仍認成巢穴戰，打完記下打倒過 MVP', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let loading = false;
+    let bar = 0;
+    let p = { x: 40, y: 40 };
+    const store = { v: false };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (loading) return null;
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => ['up'],
+        readMinimap: () => (loading ? null : { player: { ...p }, boss: null }),
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(4000);
+    loading = true; // 走進入口 → 載入畫面
+    run(3000);
+    p = { x: 10, y: 70 };
+    loading = false;
+    run(2000);
+    bar = 0.003;
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(8000);
+    expect(store.v).toBe(true);
+    expect(bot.state.activity).toBe('enter'); // 找出口
+  });
+});
+
 describe('出巢穴回原地圖', () => {
   it('小地圖位置跳動（傳送）→ 不再找出口，即使原地圖首領血條一直出現', () => {
     let t = 0;
