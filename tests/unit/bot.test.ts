@@ -1420,6 +1420,36 @@ describe('入口在畫面上：看名稱', () => {
     expect(bot.state.enterSrc).toBe('label');
     expect(bot.state.dirs).toEqual(['right', 'up']);
   });
+
+  it('看得到名稱時不理會「指示圓盤」（塔的暗色拱窗誤判）', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        portalLabel: () => (frozenClock ? { x: 0.4, y: -0.05 } : null),
+        // 正上方的「圓盤」
+        findIndicators: () => [{ kind: 'target', x: 0, y: -0.3, icon: [40, 40, 40], size: 0.05, face: true }],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(5000);
+    expect(bot.state.enterSrc).toBe('label');
+    expect(bot.state.dirs).toContain('right');
+  });
 });
 
 describe('破關帶回：外掛重新載入後仍記得打倒過 MVP', () => {
