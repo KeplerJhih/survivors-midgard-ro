@@ -46,6 +46,8 @@ export interface BotState {
   runner: boolean;
   /** 入口開著時走向的來源（除錯用） */
   enterSrc: string;
+  /** 除錯：最近一次看到首領時的巢穴判定條件（各項為「距今多少 ms」） */
+  lair?: Record<string, number | boolean>;
   /** 距上次讀到小地圖幾毫秒（除錯用） */
   mmAge: number;
   /** 最近 10 次視窗處理（除錯用：辨識成什麼、點哪裡、怎麼點） */
@@ -811,6 +813,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 實機：載入畫面讓時鐘判定出一次「跳動」→ 傳送早於它 → 打贏也沒記到打倒過 MVP）
         if (frozenBossSince === null) frozenBossSince = t;
         const enteredLair = t - mmSeenAt > 3000 || lairJumpAt >= clock.changedAt || t - frozenBossSince >= LAIR_BOSS_MS;
+        // 除錯：巢穴判定當下的各項條件（實機：Mistress 巢穴打贏後多次沒判定成巢穴、卡在原地；原因未明）
+        state.lair = {
+          at: Math.round(t),
+          frozen,
+          win: Math.round(t - lastWindowAt),
+          mm: Math.round(t - mmSeenAt),
+          jump: Math.round(t - lairJumpAt),
+          clk: Math.round(t - clock.changedAt),
+          fb: Math.round(t - frozenBossSince),
+          set: mvpFight,
+        };
         if (frozen && t - lastWindowAt > LAIR_NO_WINDOW_MS && enteredLair) {
           mvpFight = true;
           portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
