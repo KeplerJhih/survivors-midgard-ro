@@ -312,7 +312,7 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
         pointer: { tap: async (x, y) => void taps.push([x, y]) },
       },
     );
-    for (t = 60000; t < 70000; t += 250) bot.tick();
+    for (; t < 70000; t += 250) bot.tick(); // 在城鎮開外掛：一開始就不點
     expect(taps).toEqual([]);
     expect(bot.state.activity).not.toBe('screen');
   });
