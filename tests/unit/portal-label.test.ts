@@ -55,3 +55,23 @@ describe('findPortalLabel（MVP 入口 / 出口名稱）', () => {
     expect(p.y).toBeCloseTo(67 / H - 0.5 + 0.06, 1);
   });
 });
+
+describe('findPortalLabel（Niflheim 因果路線傳送門名稱）', () => {
+  it('紅色名稱 (229,109,122)（實機取樣）→ 找到；傳送門在名稱下方 0.125H', async () => {
+    const { NIFLHEIM_LABEL } = await import('@/core/vision/portal-label');
+    const f = frame((set) => text(set, 431, 93, 7, [229, 109, 122]));
+    const p = findPortalLabel(f, NIFLHEIM_LABEL)!;
+    expect(p).not.toBeNull();
+    expect(p.x).toBeGreaterThan(0.3);
+    expect(p.y).toBeCloseTo(100 / H - 0.5 + 0.125, 2);
+    // 出口的認法不會把紅色名稱當成出口
+    expect(findPortalLabel(f)).toBeNull();
+  });
+
+  it('出口的淡粉白名稱、右側傷害面板的橘色長條不算', async () => {
+    const { NIFLHEIM_LABEL } = await import('@/core/vision/portal-label');
+    expect(findPortalLabel(frame((set) => text(set, 400, 93, 8, [255, 229, 255])), NIFLHEIM_LABEL)).toBeNull();
+    // 傷害面板在 HUD 區（x ≥ 0.85）內，且橘色 (240,140,100) 比例不同
+    expect(findPortalLabel(frame((set) => text(set, 300, 150, 8, [240, 140, 100])), NIFLHEIM_LABEL)).toBeNull();
+  });
+});

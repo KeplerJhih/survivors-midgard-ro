@@ -20,7 +20,7 @@ import { approachExit, approachSwirl, fleeSwirl, probeDanger } from '@/core/visi
 import { applyAspectLock } from '@/core/display/aspect';
 import { clockGlyph } from '@/core/vision/clock';
 import { approachBeam } from '@/core/vision/loot';
-import { findPortalLabel } from '@/core/vision/portal-label';
+import { findPortalLabel, NIFLHEIM_LABEL } from '@/core/vision/portal-label';
 import { bossBar, readHp } from '@/core/vision/hud';
 import { findMinimapSquare, MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
 
@@ -118,6 +118,10 @@ export default defineContentScript({
       portalLabel: () => {
         const frame = sampleUI();
         return frame ? findPortalLabel(frame) : null;
+      },
+      routeLabel: () => {
+        const frame = sampleUI();
+        return frame ? findPortalLabel(frame, NIFLHEIM_LABEL) : null;
       },
       approachExit: () => {
         const frame = sample();
@@ -249,6 +253,7 @@ export default defineContentScript({
           structural: decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath, corruptPick: settings.bot.karmaRoute === 'niflheim' ? 'left' : 'right' }),
           legacy: detectScreen(frame),
           label: findPortalLabel(frame),
+          route: findPortalLabel(frame, NIFLHEIM_LABEL),
           indicators: findIndicators(frame),
           regions,
         };

@@ -883,7 +883,7 @@ describe('因果路線傳送門（打完 MVP 後走 Niflheim）', () => {
         approachSwirl: () => ['up'],
         approachExit: () => ['right'], // 「返回地圖」出口在右邊
         // 紅色 Niflheim 傳送門在左邊
-        scanPortals: () => ({ exit: null, danger: red ? { count: 30, x: -0.3, y: 0, w: 0.06, h: 0.06 } : null }),
+        routeLabel: () => (red ? { x: -0.3, y: 0 } : null),
       },
     );
     const run = (ms: number) => {

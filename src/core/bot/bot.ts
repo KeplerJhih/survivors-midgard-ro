@@ -80,6 +80,8 @@ export interface BotDeps {
   approachSwirl?: () => Dir[] | null;
   /** MVP 勝利後走向淡藍出口 */
   approachExit?: () => Dir[] | null;
+  /** 因果路線傳送門名稱的位置（相對畫面中心，以畫面高度正規化） */
+  routeLabel?: () => { x: number; y: number } | null;
   /** 「這局打倒過 MVP」跨外掛重新載入保存（頁面不重新整理就還在） */
   wonMvp?: { get(): boolean; set(v: boolean): void };
   /** MVP 入口 / 出口頭上的名稱（淡粉白字，被擋住也看得到）→ 傳送門位置（相對畫面中心、以畫面高度正規化） */
@@ -410,11 +412,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? clock.update(deps.clockGlyph(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
-    // 紅色 Niflheim 因果路線傳送門（沒有指示器，只能在畫面上找紅光）；連續 2 次看到才算
+    // 紅色 Niflheim 因果路線傳送門（沒有指示器）：看頭上的紅色名稱；連續 2 次看到才算
     kportal: throttle(
       INTERVAL.portal,
       () => {
-        const d = config.karmaRoute === 'niflheim' ? deps.scanPortals?.()?.danger ?? null : null;
+        const d = config.karmaRoute === 'niflheim' ? deps.routeLabel?.() ?? null : null;
         kSeen = d ? kSeen + 1 : 0;
         return d && kSeen >= 2 ? dirsFromAngle(Math.atan2(-d.y, d.x)) : null;
       },
