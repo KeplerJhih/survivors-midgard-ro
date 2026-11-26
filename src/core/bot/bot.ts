@@ -600,7 +600,14 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // ③ 結算頁出現後先等 8 秒（實機：完整物品列約 6 秒後才穩定）（進場動畫：實機第一下常點在動畫中、排序較後面的格子）
       // 「出現時間」以這次連續看到結算頁起算：超過 10 秒沒看到＝新的結算頁（實機：重載 / 手動處理後殘留舊值 → 沒等就點）
       if (act?.kind === 'result') {
-        if (resultFirstAt === null || t - resultSeenAt > 10000) resultFirstAt = t;
+        if (resultFirstAt === null || t - resultSeenAt > 10000) {
+          // 新的結算頁：上一次的格數統計作廢（實機：殘留的最大格數讓這次一直判成「格數變少」，等了 1 分多鐘才點）
+          resultFirstAt = t;
+          keepMaxLen = 0;
+          keepWaits = 0;
+          keepShortWaits = 0;
+          keepFewWaits = 0;
+        }
         resultSeenAt = t;
       }
       const keepPending = act?.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE;
