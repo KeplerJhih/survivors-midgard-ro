@@ -187,6 +187,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let keepTaken = 0;
   /** 目前分頁（以按下的分頁 x 位置識別）、這頁點了幾格、試過切到哪些分頁 */
   let keepPageTaps = 0;
+  let lastKeepLen = -1;
+  let keepWaits = 0;
   const keepTabTried = new Set<number>();
   const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
     const tabs = act.keepTabs ?? [];
@@ -557,7 +559,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const seen = gameRunning || hudGone || resultWithHud ? null : rawSeen;
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
-      if (act && pointer) {
+      // 結算頁剛出現時物品格還在進場動畫：同一位置先只切出 1 格（實機第一下點在 0.55,0.80，之後才是 12~17 格那排）
+      // → 要帶物品時，格數連續兩次取樣相同才開始點
+      const keepLen = act?.kind === 'result' ? act.keep?.length ?? 0 : -1;
+      // 格數一直跳（切割不穩）時最多等 4 次，不卡在結算頁
+      const keepUnsettled =
+        act?.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE && keepLen !== lastKeepLen && keepWaits < 4;
+      if (act) {
+        keepWaits = keepUnsettled ? keepWaits + 1 : 0;
+        lastKeepLen = keepLen;
+      }
+      if (act && pointer && !keepUnsettled) {
         state.screenTaps++;
         // 點過勝利選擇 / 結算 / 初始技能＝已離開巢穴，不再找出口（寶箱等 modal 不算：勝利後巢穴內也會跳）
         // 時間還停著＝還在巢穴裡：勝利後巢穴內也會跳對話框（實機：點掉後當成「入口開著」去追任何亮光 →
