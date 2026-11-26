@@ -238,7 +238,7 @@ export default defineContentScript({
         window.postMessage(msg, location.origin);
       },
       /** DevTools：await __msbot.inspect(imgUrl?) → 對一張截圖（640 寬；省略＝目前畫面）跑視窗 / 入口名稱 / 指示器辨識 */
-      async inspect(url?: string) {
+      async inspect(url?: string, edge?: number) {
         const img = new Image();
         img.src = url ?? canvas.toDataURL();
         await img.decode();
@@ -248,7 +248,7 @@ export default defineContentScript({
         const ctx = c.getContext('2d')!;
         ctx.drawImage(img, 0, 0, c.width, c.height);
         const frame = ctx.getImageData(0, 0, c.width, c.height);
-        const regions = parseLayout(frame);
+        const regions = parseLayout(frame, edge ? { edge } : {});
         return {
           structural: decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath, corruptPick: settings.bot.niflheimRoute ? 'left' : 'right' }),
           legacy: detectScreen(frame),

@@ -281,6 +281,22 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeCloseTo(0.875, 1);
   });
 
+  it('結算頁只有 1 件可帶：物品格邊框淡（亮度差 < 18）切不出來 → 用較細的邊緣門檻再找一次（實機 Turtle Island 傳說 1 件）', () => {
+    const FOCUS: RGB = [77, 107, 199];
+    const P: RGB = [247, 247, 247];
+    const f = draw(GRASS, [
+      { x0: 0.161, y0: 0.014, x1: 0.839, y1: 0.986, fill: P, border: [150, 155, 170] }, // 結算頁大面板
+      { x0: 0.484, y0: 0.808, x1: 0.516, y1: 0.887, fill: P, border: [235, 235, 235] }, // 唯一的物品格（邊框只差 12）
+      { x0: 0.345, y0: 0.912, x1: 0.48, y1: 0.97, fill: FOCUS, border: FOCUS },
+      { x0: 0.353, y0: 0.924, x1: 0.475, y1: 0.959, fill: BTN, border: BTN }, // 選擇目的地（焦點）
+    ], 291);
+    const a = decideByLayout(f, parseLayout(f))!;
+    expect(a.kind).toBe('result');
+    expect(a.keep?.length).toBe(1);
+    expect(a.keep![0]!.x).toBeCloseTo(0.5, 1);
+    expect(a.keep![0]!.y).toBeCloseTo(0.85, 1);
+  });
+
   it('底部 HUD 的寬條（已保留寶箱 [開啟]）不當成寬按鈕', () => {
     const f = draw(GRASS, [{ x0: 0.42, y0: 0.86, x1: 0.67, y1: 0.93, fill: BTN }]);
     expect(decide(f)).toBeNull();

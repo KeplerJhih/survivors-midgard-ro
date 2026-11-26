@@ -1,5 +1,5 @@
 import type { Frame } from './frame';
-import { cx, cy, inside, lumaOf, rh, rows, rw, type Region } from './layout';
+import { cx, cy, inside, lumaOf, parseLayout, rh, rows, rw, type Region } from './layout';
 import type { ScreenAction } from './screens';
 
 /**
@@ -72,7 +72,14 @@ export function decideByLayout(
 ): ScreenAction | null {
   const act = decideCore(f, regions, rarity, opts);
   if (act?.kind !== 'result') return act;
-  const found = keepTiles(regions, f.width / f.height);
+  let found = keepTiles(regions, f.width / f.height);
+  // 物品少時格子、分頁鈕的邊框在取樣圖上太淡（亮度差 < 18），全部和大面板連成一塊 → 用較細的邊緣門檻再切一次
+  // （實機 Turtle Island：只有 1 件傳說可帶，0 格 → 一件都沒帶就離開。門檻 8 切得出 0.484~0.516 × 0.808~0.887）
+  if (!found.length) {
+    const fine = parseLayout(f, { edge: 8 });
+    found = keepTiles(fine, f.width / f.height);
+    if (found.length) regions = fine;
+  }
   if (!found.length) return act;
   // 往左推不超出包住物品列的大面板（面板外是遊戲畫面，起伏也大）
   const box = regions
