@@ -92,6 +92,18 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeGreaterThan(0.6);
   });
 
+  it('結算頁三塊面板（中、右各有一顆按鈕在中段）不是腐化寶箱', () => {
+    const f = draw(GRASS, [
+      { x0: 0.06, y0: 0.1, x1: 0.94, y1: 0.95, fill: PANEL },
+      { x0: 0.08, y0: 0.27, x1: 0.32, y1: 0.62, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.33, y0: 0.27, x1: 0.63, y1: 0.62, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.43, y0: 0.55, x1: 0.53, y1: 0.6, fill: BTN },
+      { x0: 0.64, y0: 0.27, x1: 0.92, y1: 0.62, fill: PANEL, border: [189, 201, 230] },
+      { x0: 0.74, y0: 0.45, x1: 0.82, y1: 0.5, fill: BTN },
+    ]);
+    expect(decide(f)?.kind).not.toBe('corrupt');
+  });
+
   it('結算：全寬面板底部 4 顆按鈕 → 第 2 顆（再玩一次）', () => {
     const f = draw(GRASS, [
       { x0: 0.04, y0: 0.01, x1: 0.96, y1: 0.99, fill: PANEL },

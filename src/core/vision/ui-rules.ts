@@ -162,8 +162,15 @@ function decideCore(
     if (pair.length !== 2) continue;
     const [a, b] = pair as [Region, Region];
     if (Math.abs(rw(a) - rw(b)) > 0.03) continue;
-    const btnA = buttons.find((x) => inside(x, a, 0.01));
-    const btnB = buttons.find((x) => inside(x, b, 0.01));
+    // 按鈕在卡片底部（「選擇這條路」）；同一排沒有第三塊同高的面板。
+    // 實機：結算頁的角色面板［匯出配置］＋傷害報告［查看詳情］被當成腐化寶箱，點開傷害詳情小視窗、擋住帶物品與下一局
+    const atBottom = (x: Region, card: Region) => inside(x, card, 0.01) && cy(x) >= card.y1 - 0.25 * rh(card);
+    const third = regions.some(
+      (o) => o !== a && o !== b && rh(o) >= 0.2 && rw(o) >= 0.15 && Math.abs(cy(o) - cy(a)) < 0.05 && Math.abs(rh(o) - rh(a)) < 0.05,
+    );
+    if (third) continue;
+    const btnA = buttons.find((x) => atBottom(x, a));
+    const btnB = buttons.find((x) => atBottom(x, b));
     // 點右卡（Valhalla）的水平中心：按鈕在卡片內置中。實機切出的按鈕有時連到左卡 → 中心落在兩卡之間（0.506）沒點到
     if (btnA && btnB) return { kind: 'corrupt', x: cx(b), y: cy(btnB) };
   }
