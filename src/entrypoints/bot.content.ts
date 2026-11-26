@@ -217,10 +217,10 @@ export default defineContentScript({
         const msg: BridgeMessage = { __msbot: true, type: 'reload-extension' };
         window.postMessage(msg, location.origin);
       },
-      /** DevTools：await __msbot.inspect(imgUrl) → 對一張截圖（640 寬）跑視窗辨識，回傳判斷與版面區塊 */
-      async inspect(url: string) {
+      /** DevTools：await __msbot.inspect(imgUrl?) → 對一張截圖（640 寬；省略＝目前畫面）跑視窗 / 入口名稱 / 指示器辨識 */
+      async inspect(url?: string) {
         const img = new Image();
-        img.src = url;
+        img.src = url ?? canvas.toDataURL();
         await img.decode();
         const c = document.createElement('canvas');
         c.width = 640;
@@ -232,6 +232,8 @@ export default defineContentScript({
         return {
           structural: decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath }),
           legacy: detectScreen(frame),
+          label: findPortalLabel(frame),
+          indicators: findIndicators(frame),
           regions,
         };
       },

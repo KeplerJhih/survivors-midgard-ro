@@ -58,6 +58,9 @@ export function classifyIcon(r: number, g: number, b: number): IndicatorKind {
   return 'other';
 }
 
+/** 指示圓盤中心離畫面邊緣的最大距離（畫面高度比例；邊距 40~78px＋半徑 24，UI 放大時更寬） */
+export const EDGE_BAND = 0.2;
+
 export function findIndicators(f: Frame): Indicator[] {
   const { width: W, height: H, data } = f;
   const dark = new Uint8Array(W * H);
@@ -111,8 +114,11 @@ export function findIndicators(f: Frame): Indicator[] {
     }
     const size = (w + h) / 2 / H;
     // 沒有亮色圖示：一般是陰影；但 MVP 頭像可能整個偏暗（實機 Dark Lord）→ 下方有距離數字的仍算入口圓盤
+    // 指示圓盤一律畫在畫面邊緣（ui/chest_pointer.gd：離邊 MARGIN 40、底部 78，入口在畫面內時改畫箭頭不畫圓盤）
+    // → 只靠「頭像＋距離數字」認的圓盤必須靠邊（實機：角色自己的深色頭髮＋下方白色名字被當成入口圓盤，一直往上走）
+    const nearEdge = Math.min(sx / n, W - sx / n, sy / n, H - sy / n) <= EDGE_BAND * H;
     if (k < 2) {
-      if (!hasDistanceText(f, sx / n, sy / n, size * H)) continue;
+      if (!nearEdge || !hasDistanceText(f, sx / n, sy / n, size * H)) continue;
       out.push({ kind: 'target', x: (sx / n - W / 2) / H, y: (sy / n - H / 2) / H, icon: [0, 0, 0], size: Math.max(size, LARGE_DISC), face: true });
       continue;
     }
@@ -126,7 +132,7 @@ export function findIndicators(f: Frame): Indicator[] {
     // 寶箱圖示是金色（target），歸為 other 又有距離數字的就是 MVP 頭像 → 當成傳送門大圓盤
     let portalFace = false;
     if (cls === 'other') {
-      if (!hasDistanceText(f, sx / n, sy / n, size * H)) continue;
+      if (!nearEdge || !hasDistanceText(f, sx / n, sy / n, size * H)) continue;
       portalFace = true;
     }
     // 大圓盤（傳送門/任務）一律前往，紫色的大圓盤是 Baphomet 等 MVP 入口
