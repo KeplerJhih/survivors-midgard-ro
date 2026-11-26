@@ -741,7 +741,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           detourStreak = cont ? detourStreak + 1 : 1;
           if (detourStreak > 4) detourStreak = 1;
           if (detourStreak === 1) detourCw = !detourCw;
-          detourDirs = want.map((d) => TURN[detourCw ? 'cw' : 'ccw'][d]);
+          // 斜向被擋（常是牆角）：先只走其中一個分量（轉 45°），比轉 90° 往反方向繞近得多
+          // （實機：入口在右上、塔的牆角擋住，轉 90° 一直往左上繞，在右上 / 左上之間來回）
+          detourDirs = want.length === 2 ? [want[detourCw ? 0 : 1]!] : want.map((d) => TURN[detourCw ? 'cw' : 'ccw'][d]);
           detourUntil = t + DETOUR_MS * detourStreak;
           log?.info('enter: 卡住，往側邊繞', detourDirs);
           want = detourDirs;

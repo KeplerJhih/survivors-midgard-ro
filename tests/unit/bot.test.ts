@@ -471,6 +471,42 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
 });
 
 describe('走向傳送門撞牆', () => {
+  it('斜向被擋（牆角）→ 先只走其中一個分量（轉 45°），不轉 90° 往反方向繞', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    let moving = true;
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        detectScreen: () => null,
+        pointer: { tap: async () => {} },
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        approachSwirl: () => ['up', 'right'],
+        stillFrame: () => ({ width: 4, height: 4, data: new Uint8ClampedArray(64).fill(moving ? (Math.floor(t / 1000) % 2 ? 0 : 200) : 50) }),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(5000);
+    frozenClock = true;
+    run(6000);
+    moving = false;
+    const seen = new Set<string>();
+    for (let e = 0; e < 8000; e += 250) (t += 250), bot.tick(), seen.add([...bot.state.dirs].sort().join('+'));
+    seen.delete('right+up');
+    expect([...seen].every((d) => d === 'up' || d === 'right')).toBe(true);
+    expect(seen.size).toBeGreaterThan(0);
+  });
+
   it('繞路也撞牆（樹籬迷宮）→ 每段繞完仍會回頭試原方向，且連續卡住時同一側越繞越久、不上下來回', () => {
     let t = 0;
     let digit = 0;
