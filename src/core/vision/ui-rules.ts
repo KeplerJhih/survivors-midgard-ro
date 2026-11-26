@@ -334,19 +334,22 @@ function decideCore(
 function hasFocusFrame(f: Frame, r: Region): boolean {
   const { width: W, height: H, data } = f;
   const x0 = Math.round(r.x0 * W), x1 = Math.round(r.x1 * W), y0 = Math.round(r.y0 * H), y1 = Math.round(r.y1 * H);
-  let n = 0, tot = 0;
-  const at = (x: number, y: number) => {
+  // 四邊分開算，至少 3 邊有藍框才算：相鄰按鈕的焦點框會落在這顆的外圈一側
+  // （實機首領寶箱 [全部販賣][繼續] 緊貼：販賣鈕右側外圈＝繼續的藍框 → 被當成焦點，點了全部販賣把 Earring 賣掉）
+  const side = [0, 0, 0, 0], tot = [0, 0, 0, 0];
+  const at = (k: number, x: number, y: number) => {
     if (x < 0 || y < 0 || x >= W || y >= H) return;
-    tot++;
+    tot[k]!++;
     const i = (y * W + x) * 4;
     const R = data[i]!, G = data[i + 1]!, B = data[i + 2]!;
-    if (B >= 150 && B - R >= 40 && B - G >= 20) n++;
+    if (B >= 150 && B - R >= 40 && B - G >= 20) side[k]!++;
   };
   for (let d = 0; d <= 3; d++) {
-    for (let x = x0; x < x1; x++) (at(x, y0 - d), at(x, y1 - 1 + d));
-    for (let y = y0; y < y1; y++) (at(x0 - d, y), at(x1 - 1 + d, y));
+    for (let x = x0; x < x1; x++) (at(0, x, y0 - d), at(1, x, y1 - 1 + d));
+    for (let y = y0; y < y1; y++) (at(2, x0 - d, y), at(3, x1 - 1 + d, y));
   }
-  return tot > 0 && n >= 0.15 * tot;
+  const lit = side.filter((n, k) => tot[k]! > 0 && n >= 0.15 * tot[k]!).length;
+  return lit >= 3;
 }
 
 function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | null {

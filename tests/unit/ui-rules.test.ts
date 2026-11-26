@@ -378,6 +378,17 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeGreaterThan(0.53);
   });
 
+  it('首領寶箱 [全部販賣][繼續] 緊貼：繼續的藍框落在販賣鈕外圈一側 → 仍點繼續', () => {
+    const f = draw([35, 45, 30], [
+      { x0: 0.26, y0: 0.33, x1: 0.74, y1: 0.7, fill: PANEL },
+      { x0: 0.43, y0: 0.64, x1: 0.53, y1: 0.69, fill: BTN, border: [190, 195, 210] },
+      { x0: 0.533, y0: 0.64, x1: 0.58, y1: 0.69, fill: BTN, border: [90, 110, 220] },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeGreaterThan(0.53);
+  });
+
   it('首領寶箱對話框（背景壓暗）：點有焦點藍框的「繼續」，不點右下角空白', () => {
     const f = draw([35, 45, 30], [{ x0: 0.26, y0: 0.33, x1: 0.74, y1: 0.7, fill: PANEL }]);
     // [全部販賣 (F)]（無焦點）與 [繼續]（焦點藍框）
