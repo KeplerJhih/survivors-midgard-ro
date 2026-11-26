@@ -416,7 +416,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     kportal: throttle(
       INTERVAL.portal,
       () => {
-        const d = config.karmaRoute === 'niflheim' ? deps.routeLabel?.() ?? null : null;
+        const d = config.niflheimRoute ? deps.routeLabel?.() ?? null : null;
         kSeen = d ? kSeen + 1 : 0;
         return d && kSeen >= 2 ? dirsFromAngle(Math.atan2(-d.y, d.x)) : null;
       },
@@ -444,7 +444,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let kWaitSince: number | null = null;
   let kSeen = 0;
   const routeApproach = (t: number): Dir[] | null => {
-    if (config.karmaRoute !== 'niflheim') return null;
+    if (!config.niflheimRoute) return null;
     const k = sense.kportal.get(t);
     if (k) {
       lastK = { dirs: k, at: t };
@@ -691,7 +691,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           windowTaps >= TAPS_BEFORE_ENTER &&
           windowTaps % 2 === 1 &&
           // 腐化寶箱預設焦點是 Hel：只有要走 Niflheim 路線時才能按 Enter
-          (act.kind !== 'corrupt' || config.karmaRoute === 'niflheim') &&
+          (act.kind !== 'corrupt' || config.niflheimRoute) &&
           act.kind !== 'result' &&
           !(act.kind === 'job' && config.jobPath === 'second');
         windowTaps++;
