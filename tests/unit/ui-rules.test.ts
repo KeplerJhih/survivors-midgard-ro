@@ -368,6 +368,16 @@ describe('decideByLayout（結構判斷）', () => {
     if (a) expect(a.x < 0.414 || a.x > 0.584).toBe(true); // 不點「前往 Prontera」
   });
 
+  it('MVP 寶箱清單：只切得出左邊的「全部販賣」、焦點藍框也沒認到 → 點它右邊的「繼續」，不點販賣', () => {
+    const f = draw(GRASS, [
+      { x0: 0.263, y0: 0.138, x1: 0.738, y1: 0.862, fill: PANEL },
+      { x0: 0.43, y0: 0.812, x1: 0.525, y1: 0.841, fill: BTN },
+    ]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeGreaterThan(0.53);
+  });
+
   it('首領寶箱對話框（背景壓暗）：點有焦點藍框的「繼續」，不點右下角空白', () => {
     const f = draw([35, 45, 30], [{ x0: 0.26, y0: 0.33, x1: 0.74, y1: 0.7, fill: PANEL }]);
     // [全部販賣 (F)]（無焦點）與 [繼續]（焦點藍框）

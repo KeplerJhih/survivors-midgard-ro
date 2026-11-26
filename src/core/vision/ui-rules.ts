@@ -314,7 +314,14 @@ function decideCore(
   const focus = focusedButton(f, regions);
   if (focus) return { kind: 'modal', ...focus };
   // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
-  if (frag) return tap('modal', frag);
+  if (frag) {
+    // 寶箱視窗底排固定是 [全部販賣 (F)][繼續]（ui/menus.gd）：切出來的若是中線左邊、夠寬的完整按鈕＝全部販賣，
+    // 「繼續」緊貼在它右邊（實機：繼續只有兩個字、切不出來，焦點藍框也沒認到時會點到全部販賣把裝備賣掉）
+    const panelCx = 0.5;
+    if (rw(frag) >= 0.06 && cx(frag) < panelCx - 0.01)
+      return { kind: 'modal', x: frag.x1 + 0.025, y: cy(frag) };
+    return tap('modal', frag);
+  }
   return null;
 }
 
