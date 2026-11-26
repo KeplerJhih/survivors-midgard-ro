@@ -49,7 +49,7 @@ export interface BotState {
   /** 距上次讀到小地圖幾毫秒（除錯用） */
   mmAge: number;
   /** 最近 10 次視窗處理（除錯用：辨識成什麼、點哪裡、怎麼點） */
-  acts: { t: number; kind: string; x: number; y: number; keep: number; how: string }[];
+  acts: { t: number; kind: string; x: number; y: number; keep: number; kx?: string; how: string }[];
 }
 
 export interface Bot {
@@ -658,6 +658,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
             x: +(keepStep ?? act).x.toFixed(3),
             y: +(keepStep ?? act).y.toFixed(3),
             keep: act.keep?.length ?? 0,
+            // 除錯：切出的物品格位置（實機：結算頁一直只切出 1 格、在結算與「不存放就離開？」間來回）
+            kx: act.keep?.map((k) => k.x.toFixed(2)).join(','),
             how: keepStep ? `keep:${keepStep.what}` : enter ? 'enter' : 'tap',
           },
         ];
