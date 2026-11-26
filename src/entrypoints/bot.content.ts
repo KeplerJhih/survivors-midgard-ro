@@ -217,6 +217,24 @@ export default defineContentScript({
         const msg: BridgeMessage = { __msbot: true, type: 'reload-extension' };
         window.postMessage(msg, location.origin);
       },
+      /** DevTools：await __msbot.inspect(imgUrl) → 對一張截圖（640 寬）跑視窗辨識，回傳判斷與版面區塊 */
+      async inspect(url: string) {
+        const img = new Image();
+        img.src = url;
+        await img.decode();
+        const c = document.createElement('canvas');
+        c.width = 640;
+        c.height = Math.round((640 * img.height) / img.width);
+        const ctx = c.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        const frame = ctx.getImageData(0, 0, c.width, c.height);
+        const regions = parseLayout(frame);
+        return {
+          structural: decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath }),
+          legacy: detectScreen(frame),
+          regions,
+        };
+      },
       dispose() {
         ticker.stop();
         clearTimeout(requestTimer);

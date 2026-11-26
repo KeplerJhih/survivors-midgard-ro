@@ -347,6 +347,27 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeGreaterThan(0.9);
   });
 
+  it('窄視窗（1080×869）結算頁：面板 0.88W 只有 1.1H 也要認成結算頁，不把兩顆按鈕當確認框點「前往 Prontera」', () => {
+    const w = 640, h = 515;
+    const data = new Uint8ClampedArray(w * h * 4);
+    for (let i = 0; i < w * h; i++) data.set([...GRASS, 255], i * 4);
+    const box = (x0: number, y0: number, x1: number, y1: number, fill: RGB, border: RGB = [150, 155, 170]) => {
+      const X0 = Math.round(x0 * w), X1 = Math.round(x1 * w), Y0 = Math.round(y0 * h), Y1 = Math.round(y1 * h);
+      for (let y = Y0; y < Y1; y++)
+        for (let x = X0; x < X1; x++) {
+          const edge = x <= X0 + 1 || x >= X1 - 2 || y <= Y0 + 1 || y >= Y1 - 2;
+          data.set([...(edge ? border : fill), 255], (y * w + x) * 4);
+        }
+    };
+    // 實機區塊（640×515 取樣）：面板 0.059~0.941 × 0.095~0.903；底排切出 [再玩一次][前往 Prontera · 可以轉生了！]
+    box(0.059, 0.095, 0.941, 0.903, PANEL);
+    box(0.348, 0.85, 0.402, 0.895, BTN);
+    box(0.414, 0.85, 0.584, 0.895, BTN);
+    const a = decideByLayout({ width: w, height: h, data }, parseLayout({ width: w, height: h, data }));
+    expect(a?.kind).not.toBe('dialog');
+    if (a) expect(a.x < 0.414 || a.x > 0.584).toBe(true); // 不點「前往 Prontera」
+  });
+
   it('MVP 巢穴的淺色石板地（滿版亮區）＋下方技能列的藍色圖示 → 不是視窗、不點技能列', () => {
     // 實機：Glast Heim 墓園巢穴打贏後，地面被切成 (0,0.38)~(1,1) 的大面板，焦點規則把技能列藍框當「繼續」一直點、卡著不去出口
     const f = draw(GRASS, [{ x0: 0, y0: 0.38, x1: 1, y1: 1, fill: [200, 200, 196] }]);

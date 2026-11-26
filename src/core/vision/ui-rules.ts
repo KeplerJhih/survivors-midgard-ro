@@ -149,7 +149,9 @@ function decideCore(
   // 實機：16:9 時面板寬 0.92W（=1.64H），1568×713 寬畫面只有 0.71W（=1.56H）→ 原本「≥ 0.8W」認不出來，
   // Enter 備援按到預設焦點「選擇目的地」而換地圖。暫停選單約 0.93H → 門檻 1.2H 分得開
   const aspect = f.width / f.height;
-  const isWide = (r: Region) => rw(r) * aspect >= 1.2;
+  // 窄視窗（1080×869，寬高比 1.24）UI 改依寬度縮放：結算頁面板 0.88W＝1.1H，「≥ 1.2H」認不出來 →
+  // 兩顆按鈕被當成確認框、點右邊「前往 Prontera」回城（實機）。橫向佔 ≥ 0.85W 也算
+  const isWide = (r: Region) => rw(r) * aspect >= 1.2 || rw(r) >= 0.85;
   const buttons = regions.filter((r) => r.kind === 'button');
   const panels = regions.filter((r) => r.kind === 'panel');
   const cards = regions.filter((r) => r.kind === 'card');
@@ -226,8 +228,13 @@ function decideCore(
     const hit = atBottom
       ? resultSlots(f, Math.max(...bottom.map((r) => r.y1)), Math.max(2, Math.round(0.012 * f.height)))
       : resultSlots(f, Math.min(0.99, resultBox.y1), Math.round(0.12 * f.height));
-    if (hit && hit.slots.length === 4) return { kind: 'result', x: hit.slots[1]!, y: hit.y };
-    if (hit && hit.slots.length === 3) return { kind: 'result', x: hit.slots[0]!, y: hit.y };
+    // 掃出的位置落在已切出的按鈕上 → 改點那顆按鈕中心（實機窄視窗：記號掃出 0.401，剛好在「再玩一次」0.348~0.402 右緣）
+    const snap = (x: number, y: number) => {
+      const b = atBottom ? bottom.find((r) => x >= r.x0 - 0.01 && x <= r.x1 + 0.01) : undefined;
+      return b ? { kind: 'result' as const, x: cx(b), y: cy(b) } : { kind: 'result' as const, x, y };
+    };
+    if (hit && hit.slots.length === 4) return snap(hit.slots[1]!, hit.y);
+    if (hit && hit.slots.length === 3) return snap(hit.slots[0]!, hit.y);
   }
   // 結算（無盡模式「你倒下了」）：4 顆中間兩顆（再玩一次、前往城鎮）邊框淡、切不出來，只剩頭尾兩顆、中間空很大
   // （實機：0.361~0.422 與 0.588~0.639）→ 點空隙前 1/4（再玩一次，實際 0.43~0.49）
