@@ -1439,6 +1439,35 @@ describe('「不存放就離開？」退回結算頁', () => {
     expect(taps.slice(0, 5)).toEqual(['0.47', '0.45', '0.3', '0.34', '0.38']);
   });
 
+  it('辨識把右邊「仍要離開」當成主要按鈕（焦點藍框沒認到）→ 被退回時仍點左邊「重新選擇」', () => {
+    let t = 0;
+    let stage: 'result' | 'confirm' = 'result';
+    const taps: string[] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => true, set: () => {} },
+        detectScreen: () =>
+          stage === 'confirm'
+            ? { kind: 'dialog', x: 0.6, y: 0.53, alt: { x: 0.45, y: 0.53 } }
+            : { kind: 'result', x: 0.47, y: 0.94 },
+        pointer: {
+          tap: async (x) => {
+            taps.push(`${x}`);
+            if (stage === 'result' && x === 0.47) stage = 'confirm';
+            else if (stage === 'confirm') stage = 'result';
+          },
+        },
+      },
+    );
+    for (; t < 20000; t += 250) bot.tick();
+    const firstConfirm = taps.find((x) => x === '0.6' || x === '0.45');
+    expect(firstConfirm).toBe('0.45');
+  });
+
   it('3 件都點了還一直被退回（點沒生效）→ 退回 3 次後點仍要離開，不無限來回', () => {
     const { taps } = run(true);
     expect(taps.filter((x) => x === '0.45').length).toBeLessThanOrEqual(3);

@@ -744,7 +744,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           void keyboard.tap('enter');
         } else {
           // 倉庫已滿、結算頁按了離開 →「不存放就離開？」點「仍要離開」（預設焦點是重新選擇，會一直退回結算頁）
-          const target = leaveAnyway ? act.alt! : act;
+          // 「不存放就離開？」被退回（還能帶）→ 一定點左邊的「重新選擇」回結算頁；不靠焦點藍框
+          // （實機：藍框沒認到 → 預設點右邊「仍要離開」，一件傳說裝備沒帶就離開）
+          const back = bounced && act.alt ? (act.alt.x < act.x ? act.alt : act) : act;
+          // 仍要離開＝右邊那顆（[重新選擇][仍要離開]，ui/menus.gd _end_leave）
+          const leave = act.alt && act.alt.x > act.x ? act.alt : act;
+          const target = leaveAnyway ? leave : back;
           log?.info('screen: 點擊', act, target === act ? '' : '（仍要離開）');
           void pointer.tap(target.x, target.y);
           // 點了結算頁的按鈕不代表離開：沒帶滿 3 件會跳「不存放就離開？」、Enter 退回結算頁
