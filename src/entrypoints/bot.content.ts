@@ -82,7 +82,10 @@ export default defineContentScript({
         const pause = readPauseMenu(frame, regions);
         if (pause) return { kind: 'pause', ...pause.resume };
         const legacy = detectScreen(frame);
-        return legacy && (legacy.kind === 'result' || legacy.kind === 'corrupt') ? legacy : null;
+        // 舊顏色規則的腐化寶箱：真的寶箱要點的是卡片底部的按鈕（畫面下半部）；結算頁的「致命的敵人」粉紅框＋藍色元素
+        // 也會成立，點的位置落在中間（實機 0.78,0.50＝傷害報告「查看詳情」）→ 只收下半部的
+        if (legacy?.kind === 'corrupt') return legacy.y >= 0.6 ? legacy : null;
+        return legacy?.kind === 'result' ? legacy : null;
       },
       findIndicators: () => {
         // 640 寬：圓盤下方的距離數字（字級 11）在 320 寬只剩 1~2px、與背景混色
