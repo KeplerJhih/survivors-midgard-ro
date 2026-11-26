@@ -55,7 +55,8 @@
 
 - Hel → Niflheim：+8% 傷害、+1 等；代價 −25% HP、怪物 +6% 傷害。路線 MVP 墮落 Randgris，怪物 +35% 傷害並死亡爆炸
 - Valhalla：+6% HP 與回復、+1 等；代價怪物 +6% HP。路線 MVP Valkyrie Reginleif，怪物 +35% HP
-- 掛機建議 **Valhalla**（生存優先）。Valhalla 傳送門色 `Color(1.0,0.92,0.6)` 淡金，不會被當成青色出口
+- 打完 MVP 後的路線傳送門只有一個，方向＝`karma.route_side()`：已走過路線就固定，否則看因果值正負（開啟腐化寶箱＝偏暗、淨化＝偏亮；0 就沒有路線傳送門）。位置在出口另一側約 5.2 格（`offer_exits`：出口 `spot + side*2.6`、路線門 `spot - side*2.6`）。路線 MVP 打完後 `won_here` → 不再出現
+- 外掛預設走 Niflheim（popup 可改）；只求生存選「不進」。Valhalla 傳送門色 `Color(1.0,0.92,0.6)` 淡金，不會被當成青色出口
 - 視窗上方「這張地圖接下來的寶箱」：我選的道路（沿用）/ 隨機（`ui/menus.gd` `corrupt_auto_opts`）
 
 ### MVP 傳送門

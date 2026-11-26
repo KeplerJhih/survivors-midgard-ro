@@ -77,7 +77,7 @@ export default defineContentScript({
         // 結構判斷優先；舊顏色規則只保留特徵獨特的「結算頁」「腐化寶箱」
         // （實機：城鎮明亮石板地讓舊「初始技能」規則把屋頂當成色帶、在城鎮亂點）
         const regions = parseLayout(frame);
-        const structural = decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath });
+        const structural = decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath, corruptPick: settings.bot.karmaRoute === 'niflheim' ? 'left' : 'right' });
         if (structural) return structural;
         // 保險：停在暫停選單（同步失敗、誤按 Esc）→ 點「繼續」（同步中 bot 不會呼叫這裡）
         const pause = readPauseMenu(frame, regions);
@@ -86,7 +86,11 @@ export default defineContentScript({
         // 舊顏色規則的腐化寶箱：真的寶箱要點的是卡片底部的按鈕（畫面下半部）；結算頁的「致命的敵人」粉紅框＋藍色元素
         // 也會成立，點的位置落在中間（實機 0.78,0.50＝傷害報告「查看詳情」）→ 只收下半部的
         // Valhalla 一定是右卡 → x 也要在右半（實機點到兩卡之間 0.506，沒選到）
-        if (legacy?.kind === 'corrupt') return legacy.y >= 0.6 && legacy.x >= 0.55 ? legacy : null;
+        if (legacy?.kind === 'corrupt') {
+          if (!(legacy.y >= 0.6 && legacy.x >= 0.55)) return null;
+          // 走 Niflheim 路線：改點左卡（Hel），兩張卡左右對稱
+          return settings.bot.karmaRoute === 'niflheim' ? { ...legacy, x: 1 - legacy.x } : legacy;
+        }
         return legacy?.kind === 'result' ? legacy : null;
       },
       findIndicators: () => {
@@ -242,7 +246,7 @@ export default defineContentScript({
         const frame = ctx.getImageData(0, 0, c.width, c.height);
         const regions = parseLayout(frame);
         return {
-          structural: decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath }),
+          structural: decideByLayout(frame, regions, undefined, { jobPath: settings.bot.jobPath, corruptPick: settings.bot.karmaRoute === 'niflheim' ? 'left' : 'right' }),
           legacy: detectScreen(frame),
           label: findPortalLabel(frame),
           indicators: findIndicators(frame),

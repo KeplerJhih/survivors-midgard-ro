@@ -25,6 +25,12 @@ export interface BotConfig {
   jobPath: 'first' | 'second';
   /** 自動前往觸發的祭壇（每座都有代價，預設只開沒有代價的 Yggdrasil） */
   altars: Partial<Record<AltarId, boolean>>;
+  /**
+   * 因果路線（core/karma.gd）：打完 MVP 後除了「返回地圖」還會多一個路線傳送門，進去打更難的路線 MVP。
+   * niflheim＝腐化寶箱選 Hel（因果偏暗才會出現紅色 Niflheim 傳送門）、打完 MVP 走進紅色傳送門；
+   * none＝腐化寶箱選 Valhalla（生存優先）、只走「返回地圖」
+   */
+  karmaRoute: 'none' | 'niflheim';
   /** 走向地上貴重掉落物的光柱（卡片等；吸取範圍小，要走到旁邊才撿得到） */
   seekLoot: boolean;
 }
@@ -74,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
     jobPath: 'first',
     altars: { yggdrasil: true },
     seekLoot: true,
+    karmaRoute: 'niflheim',
   },
 };
 

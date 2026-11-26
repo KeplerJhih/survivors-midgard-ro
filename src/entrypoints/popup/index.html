@@ -71,6 +71,13 @@
       <label><input type="checkbox" data-key="bot.seekTargets" /> 自動前往寶箱 / NPC</label>
       <div class="hint">依畫面邊緣的指示器前往寶箱、任務 NPC、金波利；避開紫色催眠師</div>
       <label><input type="checkbox" data-key="bot.seekLoot" /> 撿地上掉落物（光柱）</label>
+      <label>打完 MVP 的路線傳送門
+        <select data-key="bot.karmaRoute">
+          <option value="niflheim">進 Niflheim（腐化寶箱選 Hel）</option>
+          <option value="none">不進，只回地圖（腐化寶箱選 Valhalla）</option>
+        </select>
+      </label>
+      <div class="hint">Niflheim 路線：怪物傷害 +35%、速度 +15%、死亡會爆炸，再打一隻更難的 MVP</div>
       <div class="hint">卡片等貴重掉落有光柱、吸取範圍小，走到旁邊去撿；8 秒走不到就先放棄</div>
       <label><input type="checkbox" data-key="bot.seekObjects" /> 打木箱 / 鐵箱（實驗）</label>
       <div class="hint warn">辨識準確度不足，可能被誤判拉著亂走，預設關閉</div>

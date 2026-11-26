@@ -60,6 +60,8 @@ const tap = (kind: ScreenAction['kind'], r: Region): ScreenAction => ({ kind, x:
 export interface LayoutOptions {
   /** 轉職選哪條路（左＝第一條、右＝第二條）；只有一條路的職業不受影響 */
   jobPath?: 'first' | 'second';
+  /** 腐化寶箱點哪張卡：左＝Hel（Niflheim 路線）、右＝Valhalla（預設） */
+  corruptPick?: 'left' | 'right';
 }
 
 export function decideByLayout(
@@ -243,8 +245,11 @@ function decideCore(
     if (third) continue;
     const btnA = buttons.find((x) => atBottom(x, a));
     const btnB = buttons.find((x) => atBottom(x, b));
-    // 點右卡（Valhalla）的水平中心：按鈕在卡片內置中。實機切出的按鈕有時連到左卡 → 中心落在兩卡之間（0.506）沒點到
-    if (btnA && btnB) return { kind: 'corrupt', x: cx(b), y: cy(btnB) };
+    // 預設點右卡（Valhalla）、設定走 Niflheim 路線時點左卡（Hel）；點卡片的水平中心：按鈕在卡片內置中。實機切出的按鈕有時連到左卡 → 中心落在兩卡之間（0.506）沒點到
+    if (btnA && btnB) {
+      const [l, r] = cx(a) <= cx(b) ? [a, b] : [b, a];
+      return opts.corruptPick === 'left' ? { kind: 'corrupt', x: cx(l), y: cy(l === a ? btnA : btnB) } : { kind: 'corrupt', x: cx(r), y: cy(r === a ? btnA : btnB) };
+    }
   }
 
   // ---- 轉職（Base Lv 20）----

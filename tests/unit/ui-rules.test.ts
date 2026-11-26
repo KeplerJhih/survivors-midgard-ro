@@ -92,6 +92,20 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeGreaterThan(0.6);
   });
 
+  it('腐化寶箱：設定走 Niflheim 路線 → 點左卡（Hel）的按鈕', () => {
+    const f = draw(GRASS, [
+      { x0: 0.1, y0: 0.12, x1: 0.9, y1: 0.9, fill: PANEL },
+      { x0: 0.18, y0: 0.45, x1: 0.49, y1: 0.88, fill: PANEL },
+      { x0: 0.2, y0: 0.8, x1: 0.47, y1: 0.86, fill: BTN },
+      { x0: 0.51, y0: 0.45, x1: 0.82, y1: 0.88, fill: PANEL },
+      { x0: 0.53, y0: 0.8, x1: 0.8, y1: 0.86, fill: BTN },
+    ]);
+    const a = decideByLayout(f, parseLayout(f), undefined, { corruptPick: 'left' })!;
+    expect(a.kind).toBe('corrupt');
+    expect(a.x).toBeCloseTo(0.335, 1);
+    expect(a.y).toBeCloseTo(0.83, 1);
+  });
+
   it('倉庫已滿的替換視窗（小面板內一大格物品＋右下兩顆按鈕）→ 點左邊的取消', () => {
     const boxes: { x0: number; y0: number; x1: number; y1: number; fill: RGB; border?: RGB }[] = [
       { x0: 0.31, y0: 0.29, x1: 0.69, y1: 0.7, fill: PANEL },

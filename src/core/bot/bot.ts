@@ -112,6 +112,8 @@ const LAIR_BOSS_MS = 8000;
 /** 勝利後看不到出口：沿最後方向走多久、原地等到多久才交回一般走位 */
 const EXIT_COAST_MS = 3000;
 const EXIT_WAIT_MS = 12000;
+/** 出口在畫面上、還沒看到路線傳送門時最多等多久 */
+const KPORTAL_WAIT_MS = 4000;
 /** 走向傳送門時畫面靜止多久＝撞牆 → 往側邊繞 DETOUR_MS */
 const STUCK_MS = 1500;
 // 先短後長（0.9 → 1.8 → 2.7 → 3.6 秒，左右輪流）：缺口常在旁邊一點點（實機：Glast Heim 兩座塔之間，
@@ -408,6 +410,16 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? clock.update(deps.clockGlyph(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
+    // 紅色 Niflheim 因果路線傳送門（沒有指示器，只能在畫面上找紅光）；連續 2 次看到才算
+    kportal: throttle(
+      INTERVAL.portal,
+      () => {
+        const d = config.karmaRoute === 'niflheim' ? deps.scanPortals?.()?.danger ?? null : null;
+        kSeen = d ? kSeen + 1 : 0;
+        return d && kSeen >= 2 ? dirsFromAngle(Math.atan2(-d.y, d.x)) : null;
+      },
+      null as Dir[] | null,
+    ),
     label: throttle(
       INTERVAL.swirl,
       () => {
@@ -425,7 +437,30 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
    * 看不到出口：先沿最後方向走 3 秒，之後原地等；12 秒都沒再看到才交回一般走位（避免永遠卡住）
    */
   let lastExit: { dirs: Dir[]; at: number } | null = null;
+  /** 路線傳送門：最後看到的方向；出口已在畫面上卻還沒看到路線傳送門時開始等的時間 */
+  let lastK: { dirs: Dir[]; at: number } | null = null;
+  let kWaitSince: number | null = null;
+  let kSeen = 0;
+  const routeApproach = (t: number): Dir[] | null => {
+    if (config.karmaRoute !== 'niflheim') return null;
+    const k = sense.kportal.get(t);
+    if (k) {
+      lastK = { dirs: k, at: t };
+      return k;
+    }
+    // 紅光會閃（ground_glow 透明度來回）→ 短暫看不到時沿最後方向走
+    if (lastK && t - lastK.at < EXIT_COAST_MS) return lastK.dirs;
+    // 出口已在畫面上（不是靠畫面外指示器）卻還沒看到路線傳送門：兩者相距約 5 格（mvp_raid.gd offer_exits），
+    // 先原地等一下再走出口，免得還沒認出紅門就踩進出口。沒開過腐化寶箱（因果為 0）就不會有路線傳送門
+    if (!lastK && !sense.pointer.get(t) && (sense.label.get(t) ?? sense.exit.get(t))) {
+      if (kWaitSince === null) kWaitSince = t;
+      if (t - kWaitSince < KPORTAL_WAIT_MS) return [];
+    }
+    return null;
+  };
   const exitApproach = (t: number): Dir[] | null => {
+    const route = routeApproach(t);
+    if (route) return route;
     // 名稱（與出口顏色、語言無關，被擋住也畫在最上層）優先於淡藍光；因果路線傳送門名稱是金 / 紅色，不會認錯
     const d = sense.pointer.get(t) ?? sense.label.get(t) ?? sense.exit.get(t);
     if (d) {
@@ -653,7 +688,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           !leaveAnyway &&
           windowTaps >= TAPS_BEFORE_ENTER &&
           windowTaps % 2 === 1 &&
-          act.kind !== 'corrupt' &&
+          // 腐化寶箱預設焦點是 Hel：只有要走 Niflheim 路線時才能按 Enter
+          (act.kind !== 'corrupt' || config.karmaRoute === 'niflheim') &&
           act.kind !== 'result' &&
           !(act.kind === 'job' && config.jobPath === 'second');
         windowTaps++;
@@ -777,6 +813,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           mvpFight = true;
           portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
           lastExit = null;
+          lastK = null;
+          kWaitSince = null;
         }
       }
       // 時間還停著＝還在巢穴裡（非無盡模式勝利後時鐘不會走）→ 繼續找出口，不因時限放棄
