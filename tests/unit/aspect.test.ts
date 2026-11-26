@@ -31,16 +31,21 @@ describe('applyAspectLock', () => {
     Object.defineProperty(window, 'innerWidth', { get: () => size.w, configurable: true });
     Object.defineProperty(window, 'innerHeight', { get: () => size.h, configurable: true });
     const css = () => [...document.querySelectorAll('style')].map((s) => s.textContent).join('');
+    Object.defineProperty(window, 'devicePixelRatio', { get: () => 2, configurable: true });
     const unlock = applyAspectLock(window, 2.2);
     expect([window.innerWidth, window.innerHeight]).toEqual([1080, 491]);
     expect(css()).toContain('top:208px !important');
+    // 畫布實際像素固定：innerWidth × devicePixelRatio 一律是 3136
+    expect(window.innerWidth * window.devicePixelRatio).toBeCloseTo(3136, 5);
 
     size = { w: 2560, h: 800 };
     window.dispatchEvent(new Event('resize'));
     expect([window.innerWidth, window.innerHeight]).toEqual([1760, 800]);
+    expect(window.innerWidth * window.devicePixelRatio).toBeCloseTo(3136, 5);
     expect(css()).toContain('left:400px !important');
 
     unlock();
+    expect(window.devicePixelRatio).toBe(2);
     expect([window.innerWidth, window.innerHeight]).toEqual([2560, 800]);
     expect(css()).toBe('');
   });

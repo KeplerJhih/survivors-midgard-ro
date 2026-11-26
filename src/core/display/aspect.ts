@@ -15,6 +15,15 @@
 /** 外掛實機調校、驗證最久的視窗比例（約 1568×713，也接近手機橫向） */
 export const LOCKED_ASPECT = 2.2;
 
+/**
+ * 鎖定時畫布的實際像素寬度（＝調校用視窗 1568 CSS px × DPR 2）。
+ * 只鎖比例不夠：視窗小，畫布像素就少，文字筆畫變細，縮圖後與黑外框混色
+ * （實機 1079 寬：「返回地圖」名稱縮到 640 後沒有任何原色像素 → 認不出出口，角色卡在巢穴）。
+ * Godot 以 innerWidth × devicePixelRatio 決定畫布像素 → 一併改寫 devicePixelRatio，
+ * 讓畫布像素固定（實機：1079 寬視窗的畫布由 2158 變 3136，版面不變）。
+ */
+export const RENDER_WIDTH = 3136;
+
 export interface Box {
   width: number;
   height: number;
@@ -37,6 +46,8 @@ export function applyAspectLock(win: Window, ratio = LOCKED_ASPECT): () => void 
   const box = () => fitAspect(origW?.get?.call(win) ?? doc.documentElement.clientWidth, origH?.get?.call(win) ?? doc.documentElement.clientHeight, ratio);
   Object.defineProperty(win, 'innerWidth', { get: () => box().width, configurable: true });
   Object.defineProperty(win, 'innerHeight', { get: () => box().height, configurable: true });
+  const origDpr = Object.getOwnPropertyDescriptor(win, 'devicePixelRatio');
+  Object.defineProperty(win, 'devicePixelRatio', { get: () => RENDER_WIDTH / box().width, configurable: true });
 
   const style = doc.createElement('style');
   const place = () => {
@@ -52,5 +63,6 @@ export function applyAspectLock(win: Window, ratio = LOCKED_ASPECT): () => void 
     style.remove();
     if (origW) Object.defineProperty(win, 'innerWidth', origW);
     if (origH) Object.defineProperty(win, 'innerHeight', origH);
+    if (origDpr) Object.defineProperty(win, 'devicePixelRatio', origDpr);
   };
 }
