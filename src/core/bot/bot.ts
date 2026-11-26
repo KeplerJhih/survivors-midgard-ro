@@ -720,6 +720,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (keepStep) {
           log?.info('result: 帶回倉庫', keepStep.what, keepTaken);
           void pointer.tap(keepStep.x, keepStep.y);
+          // 點物品格會跳出物品說明框並留在畫面上，蓋住左側物品格與面板邊框 → 下一次取樣認不出結算頁
+          // （實機：帶 1 件後停住，最後被當成別的畫面離開、其餘沒帶）。點一下面板標題列讓說明框消失
+          if (keepStep.what === 'item') setTimeout(() => void pointer.tap(0.5, 0.035), 350);
         } else if (enter) {
           log?.info('screen: 點擊無效，改按 Enter', act);
           void keyboard.tap('enter');

@@ -307,6 +307,13 @@ function decideCore(
   // 一般對話框點了「前往 Prontera」進城鎮）→ 直接沿按鈕底邊掃圓角記號切出每顆按鈕
   const resultBox = regions.find((r) => isWide(r) && rh(r) >= 0.7 && Math.abs(cx(r) - 0.5) < 0.06);
   if (resultBox) {
+    // 底排只切得出一顆有焦點藍框的寬按鈕＝「選擇目的地 · XX 已解鎖！」（預設焦點、字多所以寬）；其餘三顆邊框淡切不出來。
+    // 「再玩一次」緊接在它右邊（實機 640 寬取樣：選擇目的地 223~305、再玩一次 312~341 → 右緣 + 0.034W）。
+    // 圓角記號掃描在這裡不可靠：面板側邊落在掃描範圍內被當成記號；排除側邊後 4 個記號又會被解讀成
+    // 「3 顆、第一顆是再玩一次」而點到選擇目的地（實機：結算頁被當成一般視窗、物品沒帶完就離開）
+    const low = buttons.filter((b) => cy(b) >= 0.85 && b.x0 >= resultBox.x0 && b.x1 <= resultBox.x1);
+    if (low.length === 1 && rw(low[0]!) >= 0.07 && hasFocusFrame(f, low[0]!))
+      return { kind: 'result', x: low[0]!.x1 + 0.034, y: cy(low[0]!) };
     // 有切出底排（在畫面底部）就沿它的底邊掃；否則掃畫面底部 88~99%
     // （實機：一顆都切不出來 → 點成一般視窗進城鎮；開了「傷害詳情」小視窗時最下排變成上方的統計格）
     const atBottom = bottom && cy(bottom[0]!) >= 0.85;
