@@ -1475,6 +1475,74 @@ describe('「不存放就離開？」退回結算頁', () => {
   });
 });
 
+describe('結算頁帶物品後焦點移走、被誤判成別的畫面', () => {
+  it('帶完 1 件後結算頁被判成選地圖（點下去會進城鎮）→ 仍點帶物品前認出的再玩一次', () => {
+    let t = 0;
+    let stage: 'result' | 'after' | 'done' = 'result';
+    const taps: string[] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => true, set: () => {} },
+        detectScreen: () =>
+          stage === 'result'
+            ? { kind: 'result', x: 0.47, y: 0.94, keep: [{ x: 0.5, y: 0.85 }] }
+            : stage === 'after'
+              ? { kind: 'map-select', x: 0.53, y: 0.94 } // 前往 Prontera
+              : null,
+        pointer: {
+          tap: async (x) => {
+            taps.push(`${x}`);
+            if (x === 0.5 && stage === 'result') stage = 'after';
+            else if (x === 0.47 || x === 0.53) stage = 'done';
+          },
+        },
+      },
+    );
+    for (; t < 30000; t += 250) bot.tick();
+    expect(taps).toContain('0.5');
+    expect(taps).not.toContain('0.53');
+    expect(taps).toContain('0.47');
+  });
+
+  it('之後跳「不存放就離開？」→ 點仍要離開（退回去會點到已存入的格子＝取消存入）', () => {
+    let t = 0;
+    let stage: 'result' | 'after' | 'confirm' | 'done' = 'result';
+    const taps: string[] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => true, set: () => {} },
+        detectScreen: () =>
+          stage === 'result'
+            ? { kind: 'result', x: 0.47, y: 0.94, keep: [{ x: 0.5, y: 0.85 }] }
+            : stage === 'after'
+              ? { kind: 'map-select', x: 0.53, y: 0.94 }
+              : stage === 'confirm'
+                ? { kind: 'dialog', x: 0.45, y: 0.53, alt: { x: 0.6, y: 0.53 } }
+                : null,
+        pointer: {
+          tap: async (x) => {
+            taps.push(`${x}`);
+            if (x === 0.5 && stage === 'result') stage = 'after';
+            else if (x === 0.47 && stage === 'after') stage = 'confirm';
+            else if (stage === 'confirm') stage = x === 0.6 ? 'done' : 'after';
+          },
+        },
+      },
+    );
+    for (; t < 40000; t += 250) bot.tick();
+    expect(taps).not.toContain('0.45');
+    expect(taps).toContain('0.6');
+  });
+});
+
 describe('倉庫已滿', () => {
   it('跳出替換視窗 → 點取消、不再帶；「不存放就離開？」點仍要離開', () => {
     let t = 0;

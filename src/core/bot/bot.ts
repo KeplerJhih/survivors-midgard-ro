@@ -210,6 +210,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let resultFirstAt: number | null = null;
   let resultSeenAt = -Infinity;
   let resultLeftPending = false;
+  /** 帶物品途中的結算頁按鈕位置（帶完要點的「再玩一次」）；點了結算按鈕就清掉 */
+  let keepingResult: { x: number; y: number; at: number } | null = null;
+  let keepForfeit = false;
   let storageFull = false;
   /** 結算頁按了離開卻被「不存放就離開？」退回的次數 */
   let resultBounces = 0;
@@ -323,6 +326,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           resultFirstAt = null;
           storageFull = false;
           resultBounces = 0;
+          keepForfeit = false;
+          keepingResult = null;
           keepFewWaits = 0;
           keepTappedX.length = 0;
           keepTabTried.clear();
@@ -638,7 +643,19 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 實機：巢穴淺色石板地讓舊「結算頁」顏色規則成立，一直點底部技能列（跳出技能說明）而不去出口
       sense.vitals.get(t);
       const resultWithHud = rawSeen?.kind === 'result' && !!deps.readHp && t - hpSeenAt < 1500;
-      const seen = gameRunning || hudGone || resultWithHud || t < screenMuteUntil ? null : rawSeen;
+      let seen = gameRunning || hudGone || resultWithHud || t < screenMuteUntil ? null : rawSeen;
+      // 結算頁帶物品途中：點了物品格後遊戲把焦點移到那格，「選擇目的地」的焦點藍框消失、底排又切不出來
+      // → 結算頁被誤判成別的畫面（實機：判成選地圖、點了「前往 Prontera」進城鎮）。
+      // 帶物品後 8 秒內看到的畫面（確認框、倉庫已滿除外）都當成同一個結算頁，按鈕沿用帶物品前認出的位置
+      if (seen && keepingResult && t - keepingResult.at < 8000 && seen.kind !== 'result' && seen.kind !== 'dialog' && seen.kind !== 'storage-full')
+      {
+        seen = { kind: 'result', x: keepingResult.x, y: keepingResult.y };
+        keepingResult.at = t;
+        // 認不出結算頁＝也看不到物品格 → 不再帶（等格數穩定會一直等下去），直接點再玩一次；
+        // 之後跳「不存放就離開？」就點仍要離開（退回去會再點到已存入的格子＝取消存入）
+        keepTaken = KEEP_FREE;
+        keepForfeit = true;
+      }
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       // 結算頁剛出現時物品格還在進場動畫：同一位置先只切出 1 格（實機第一下點在 0.55,0.80，之後才是 12~17 格那排）
@@ -695,7 +712,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           if (!wonMvpThisRun) log?.info('result: 被退回＝打倒過 MVP，補帶物品');
           setWon(true);
         }
-        const leaveAnyway = act.kind === 'dialog' && resultLeftPending && !!act.alt && (storageFull || resultBounces >= 3);
+        const leaveAnyway = act.kind === 'dialog' && resultLeftPending && !!act.alt && (storageFull || resultBounces >= 3 || keepForfeit);
         const enter =
           !leaveAnyway &&
           windowTaps >= TAPS_BEFORE_ENTER &&
@@ -736,6 +753,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         if (keepStep) {
           log?.info('result: 帶回倉庫', keepStep.what, keepTaken);
           void pointer.tap(keepStep.x, keepStep.y);
+          keepingResult = { x: act.x, y: act.y, at: t };
           // 點物品格會跳出物品說明框並留在畫面上，蓋住左側物品格與面板邊框 → 下一次取樣認不出結算頁
           // （實機：帶 1 件後停住，最後被當成別的畫面離開、其餘沒帶）。點一下面板標題列讓說明框消失
           if (keepStep.what === 'item') setTimeout(() => void pointer.tap(0.5, 0.035), 350);
@@ -756,6 +774,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           // （實機：在這裡就清掉「打倒過 MVP」→ 剩下 2 件不再帶、一直點再玩一次原地打轉）
           // → 等下一局 HP 條出現才重設（見 vitals）
           if (act.kind === 'result') resultLeftPending = true;
+          keepingResult = null;
         }
         // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步。
         // 升級三張普通卡也會被判成初始技能 → 限制頻率，避免對局中一直開暫停選單
