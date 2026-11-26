@@ -58,8 +58,8 @@ export function classifyIcon(r: number, g: number, b: number): IndicatorKind {
   return 'other';
 }
 
-/** 指示圓盤中心離畫面邊緣的最大距離（畫面高度比例；邊距 40~78px＋半徑 24，UI 放大時更寬） */
-export const EDGE_BAND = 0.2;
+/** 指示圓盤中心離畫面邊緣的最大距離（畫面高度比例；邊距 40~78px＋半徑 24，UI 放大時更寬；實機 1080×869 量到 0.21H） */
+export const EDGE_BAND = 0.3;
 
 export function findIndicators(f: Frame): Indicator[] {
   const { width: W, height: H, data } = f;
