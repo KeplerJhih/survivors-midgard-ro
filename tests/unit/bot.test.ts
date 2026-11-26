@@ -1457,6 +1457,44 @@ describe('進巢穴的載入畫面', () => {
   });
 });
 
+describe('巢穴判斷：沒看到傳送也能認出', () => {
+  it('時鐘停住＋首領血條連續 8 秒以上 → 巢穴戰，打完記下打倒過 MVP', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    const store = { v: false };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => ['up'],
+        readMinimap: () => ({ player: { x: 40, y: 40 }, boss: null }),
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(4000);
+    bar = 0.003;
+    for (let i = 0; i < 24; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    run(8000);
+    expect(store.v).toBe(true);
+  });
+});
+
 describe('出巢穴回原地圖', () => {
   it('小地圖位置跳動（傳送）→ 不再找出口，即使原地圖首領血條一直出現', () => {
     let t = 0;

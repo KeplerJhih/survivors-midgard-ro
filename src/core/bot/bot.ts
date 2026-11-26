@@ -107,6 +107,8 @@ const STILL_CLOCK_GAP = 4000;
 const GAME_RUNNING_MS = 2000;
 /** 時鐘停住且最近這段時間沒看到視窗，才算在 MVP 巢穴裡（視窗造成的暫停不算） */
 const LAIR_NO_WINDOW_MS = 5000;
+/** 時鐘停住＋首領血條連續這麼久＝巢穴戰（原地圖寶箱視窗的停住很短） */
+const LAIR_BOSS_MS = 8000;
 /** 勝利後看不到出口：沿最後方向走多久、原地等到多久才交回一般走位 */
 const EXIT_COAST_MS = 3000;
 const EXIT_WAIT_MS = 12000;
@@ -172,6 +174,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let lastBossAt = -Infinity;
   /** 時鐘停住期間小地圖位置跳動（走進巢穴＝傳送）的時間 */
   let lairJumpAt = -Infinity;
+  let frozenBossSince: number | null = null;
   /** 目前這個視窗已點過幾次（視窗消失即歸零） */
   let windowTaps = 0;
   /** 靜止開始時是否在對局中（null＝畫面在動） */
@@ -721,6 +724,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       wasFrozen = frozen;
       // 時間停住期間打過首領＝在 MVP 巢穴裡（入口開著時一般怪物會被清掉，不會有首領）→ 勝利後找淡藍出口。
       // 實機：無盡模式勝利後巢穴內時鐘恢復走動 → 不能靠「停住」判斷，改成首領消失後 30 秒內都找出口
+      if (!(frozen && vitals.boss)) frozenBossSince = null;
       if (vitals.boss) {
         lastBossAt = t;
         // 一般首領戰中時鐘停住一定是視窗暫停（實機：寶箱視窗讓時鐘停 → 被當成巢穴，打完在地圖上找出口亂轉）；
@@ -730,7 +734,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 時鐘還沒恢復、又剛好 5 秒沒認到視窗 → 被當成巢穴，打完在原地圖「找出口」不打怪（實機）
         // 「時鐘最後一次跳動」之後才傳送＝走進巢穴。不用「沒判定停住」的時間：進巢穴的載入畫面讀不到時鐘，
         // 停住判定會短暫解除（實機：打贏 MVP 卻沒認成巢穴戰 → 沒記打倒過 MVP → 結算頁沒帶物品）
-        const enteredLair = t - mmSeenAt > 3000 || lairJumpAt >= clock.changedAt;
+        // 或「時鐘停住＋首領血條」已連續 8 秒以上（原地圖寶箱視窗造成的停住，視窗一關時鐘就走；
+        // 實機：載入畫面讓時鐘判定出一次「跳動」→ 傳送早於它 → 打贏也沒記到打倒過 MVP）
+        if (frozenBossSince === null) frozenBossSince = t;
+        const enteredLair = t - mmSeenAt > 3000 || lairJumpAt >= clock.changedAt || t - frozenBossSince >= LAIR_BOSS_MS;
         if (frozen && t - lastWindowAt > LAIR_NO_WINDOW_MS && enteredLair) {
           mvpFight = true;
           portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
