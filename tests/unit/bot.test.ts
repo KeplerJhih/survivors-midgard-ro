@@ -862,6 +862,44 @@ describe('入口開著、畫面上找不到入口（暗色地圖）', () => {
   });
 });
 
+describe('誤判的視窗（點不掉）', () => {
+  it('入口開著時地板一直被當成確認框 → 點 12 次後暫停處理視窗，角色去找入口', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let taps = 0;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        detectScreen: () => (frozenClock ? { kind: 'dialog', x: 0.83, y: 0.22 } : null),
+        pointer: { tap: async () => void taps++ },
+        approachSwirl: () => ['left'], // 入口的光在左邊
+      },
+    );
+    let entering = 0;
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) {
+        t += 250;
+        bot.tick();
+        if (bot.state.activity === 'enter') entering++;
+      }
+    };
+    run(4000);
+    frozenClock = true; // 入口開啟、時鐘停住；同時地板被誤判成確認框
+    run(60000);
+    expect(taps).toBeGreaterThan(0);
+    expect(entering).toBeGreaterThan(20); // 有一段時間（≥ 5 秒）在走向入口，不是一直原地點
+  });
+});
+
 describe('因果路線傳送門（打完 MVP 後走 Niflheim）', () => {
   const win = (niflheimRoute: boolean, red: boolean) => {
     let t = 0;

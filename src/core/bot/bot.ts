@@ -114,6 +114,8 @@ const LAIR_NO_WINDOW_MS = 5000;
 /** 時鐘停住＋首領血條連續這麼久＝巢穴戰（原地圖寶箱視窗的停住很短） */
 const LAIR_BOSS_MS = 8000;
 /** 勝利後看不到出口：沿最後方向走多久、原地等到多久才交回一般走位 */
+const SCREEN_GIVE_UP_TAPS = 12;
+const SCREEN_MUTE_MS = 20000;
 const EXIT_COAST_MS = 3000;
 const EXIT_WAIT_MS = 12000;
 /** 出口在畫面上、還沒看到路線傳送門時最多等多久 */
@@ -184,6 +186,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let frozenBossSince: number | null = null;
   /** 目前這個視窗已點過幾次（視窗消失即歸零） */
   let windowTaps = 0;
+  /** 同一個「視窗」點了很多次都沒消失 → 多半是誤判，這段時間內不處理視窗、讓角色繼續行動 */
+  let screenMuteUntil = -Infinity;
   /** 靜止開始時是否在對局中（null＝畫面在動） */
   let stillInRun: boolean | null = null;
   let lastEnter = -Infinity;
@@ -630,7 +634,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 實機：巢穴淺色石板地讓舊「結算頁」顏色規則成立，一直點底部技能列（跳出技能說明）而不去出口
       sense.vitals.get(t);
       const resultWithHud = rawSeen?.kind === 'result' && !!deps.readHp && t - hpSeenAt < 1500;
-      const seen = gameRunning || hudGone || resultWithHud ? null : rawSeen;
+      const seen = gameRunning || hudGone || resultWithHud || t < screenMuteUntil ? null : rawSeen;
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       // 結算頁剛出現時物品格還在進場動畫：同一位置先只切出 1 格（實機第一下點在 0.55,0.80，之後才是 12~17 格那排）
@@ -697,6 +701,14 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           act.kind !== 'result' &&
           !(act.kind === 'job' && config.jobPath === 'second');
         windowTaps++;
+        // 點 / 按 Enter 共 12 次（約 30 秒）視窗都還在：真的視窗早該關了 → 當成誤判，停 20 秒不處理視窗。
+        // 實機 Toy Factory：MVP 入口開著（時鐘停住）時淺色地板被當成確認框，外掛原地一直點、不去找入口。
+        // 結算頁要帶物品、切分頁，次數本來就多 → 不算
+        if (windowTaps >= SCREEN_GIVE_UP_TAPS && act.kind !== 'result') {
+          log?.warn('screen: 點了很多次都沒消失，暫停處理視窗', act);
+          screenMuteUntil = t + SCREEN_MUTE_MS;
+          windowTaps = 0;
+        }
         // 破關（打倒過 MVP）的結算頁：先免費帶 3 件回 Kafra 倉庫（不帶就離開會被賣掉），再點再玩一次。
         // 每格只點一次（再點一次＝取消保存）
         // 只顯示目前稀有度分頁（傳說 > 紫色 > 其餘，預設停在最高的）；這頁不足 3 件 → 切到右邊下一頁繼續
