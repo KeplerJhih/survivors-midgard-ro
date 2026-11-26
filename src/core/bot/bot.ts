@@ -132,8 +132,9 @@ const MINIMAP_STUCK_MS = 2000;
 const MAP_JUMP_PX = 15;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
-/** HP 條與小地圖連續這麼久都讀不到＝不在對局（城鎮）→ 不辨識視窗。結算→選地圖→初始技能一路都在 60 秒內 */
-const TOWN_NO_HUD_MS = 60000;
+/** HP 條與小地圖連續這麼久都讀不到＝不在對局（城鎮）→ 不辨識視窗。
+ * 原 60 秒：結算頁帶物品等畫面穩定 + 格數統計殘留，停留超過 60 秒 → 被當成城鎮、結算頁不再點（實機卡住）→ 180 秒 */
+const TOWN_NO_HUD_MS = 180000;
 /** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
 const TAPS_BEFORE_ENTER = 3;
 /** 破關時免費帶回倉庫的件數（game_data.gd KEEP_WIN） */
