@@ -128,7 +128,7 @@ const POINTER_COAST_MS = 3000;
 const MINIMAP_STUCK_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
-/** HP 條連續這麼久讀不到＝不在對局（城鎮）→ 不辨識視窗。結算→選地圖→初始技能一路都在 60 秒內 */
+/** HP 條與小地圖連續這麼久都讀不到＝不在對局（城鎮）→ 不辨識視窗。結算→選地圖→初始技能一路都在 60 秒內 */
 const TOWN_NO_HUD_MS = 60000;
 /** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
 const TAPS_BEFORE_ENTER = 3;
@@ -532,7 +532,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       if (rawSeen) lastWindowAt = t;
       // 城鎮：沒有 HP 條、時鐘也不走 → 明亮石板地會被當成結算頁 / 視窗，點到扭蛋機、NPC（實機 Prontera）
       // 開啟外掛後還沒看過 HP 條也算（在城鎮開外掛會立刻亂點；開局的初始技能請手動選或等 HUD 出現）
-      const hudGone = !!deps.readHp && t - hpSeenAt >= TOWN_NO_HUD_MS;
+      // HP 讀數偶爾整段失效（實機 Valhalla：左側 MVP 面板出現後一直 -1）→ 小地圖也看得到就還在對局（城鎮沒有小地圖）
+      const hudGone = !!deps.readHp && t - Math.max(hpSeenAt, mmSeenAt) >= TOWN_NO_HUD_MS;
       // 結算頁會把 HUD 整個藏起來（menus.gd show_end：world.hud.hide()）→ HP 條還讀得到就不是結算頁。
       // 實機：巢穴淺色石板地讓舊「結算頁」顏色規則成立，一直點底部技能列（跳出技能說明）而不去出口
       sense.vitals.get(t);

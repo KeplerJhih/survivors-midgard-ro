@@ -317,6 +317,25 @@ describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
     expect(bot.state.activity).not.toBe('screen');
   });
 
+  it('HP 讀數失效但小地圖還在（對局中）→ 照常點視窗', () => {
+    let t = 0;
+    const taps: [number, number][] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        readHp: () => null,
+        readMinimap: () => ({ player: { x: 50, y: 50 }, boss: null }),
+        detectScreen: () => ({ kind: 'modal', x: 0.5, y: 0.7 }),
+        pointer: { tap: async (x, y) => void taps.push([x, y]) },
+      },
+    );
+    for (; t < 70000; t += 250) bot.tick();
+    expect(taps.length).toBeGreaterThan(0);
+  });
+
   it('HP 條還讀得到時的「結算頁」是誤判（巢穴淺色地面）→ 不點；HUD 消失後才點', () => {
     let t = 0;
     let hud = true;
