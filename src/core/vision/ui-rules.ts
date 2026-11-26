@@ -326,7 +326,8 @@ function hasFocusFrame(f: Frame, r: Region): boolean {
 
 function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | null {
   const box = regions.find(
-    (r) => (r.kind === 'panel' || r.kind === 'card') && Math.abs(cx(r) - 0.5) < 0.06 && rw(r) * rh(r) >= 0.15 && r.fill >= 0.5,
+    // 寬 < 0.95：視窗不會貼滿左右兩側；實機 MVP 巢穴淺色石板地被切成滿版面板 → 把技能列藍框當「繼續」一直點
+    (r) => (r.kind === 'panel' || r.kind === 'card') && Math.abs(cx(r) - 0.5) < 0.06 && rw(r) < 0.95 && rw(r) * rh(r) >= 0.15 && r.fill >= 0.5,
   );
   if (!box) return null;
   const { width: W, height: H, data } = f;
