@@ -33,6 +33,9 @@ export interface FreezeDetector {
 }
 
 /** 字形連續 freezeMs 不變 → 停住。必須先看過它走動（開局就停住不判定）；偶爾讀不到（方框被遮）沿用上次狀態 */
+/** 沒看過時鐘走動時，要連續不變這麼久才算停住 */
+const UNTICKED_FREEZE_MS = 12000;
+
 export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
   let last: Uint8Array | null = null;
   let lastOn = 0;
@@ -86,7 +89,9 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
       }
       last = glyph;
       lastOn = on;
-      return (state = ticked && now - changedAt >= freezeMs);
+      // 沒看過走動但讀得到時鐘、一直停著很久 → 也算停住（實機：入口開著時重新載入外掛 →
+      // 永遠判定不出停住，把入口當一般畫面走位，入口指示器也不理）。門檻放長，避免剛開局的短暫停頓
+      return (state = now - changedAt >= (ticked ? freezeMs : UNTICKED_FREEZE_MS));
     },
   };
 }

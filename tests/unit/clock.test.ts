@@ -37,11 +37,19 @@ describe('createFreezeDetector', () => {
     for (let i = 0; i < 3; i++, t += 1000) expect(d.update(glyph(50), t)).toBe(true);
   });
 
-  it('沒看過走動（開局就停住）、讀不到時鐘都不判定', () => {
+  it('沒看過走動：短暫停住（開局）、讀不到時鐘都不判定', () => {
     const d = createFreezeDetector(3000);
     for (let s = 0; s < 8; s++) expect(d.update(glyph(0), s * 1000)).toBe(false);
     expect(d.ticking).toBe(false);
     expect(d.update(null, 9000)).toBe(false);
+  });
+
+  it('沒看過走動但時鐘一直停著 12 秒以上 → 判定停住（入口開著時重新載入外掛）', () => {
+    const d = createFreezeDetector(3000);
+    let r = false;
+    for (let s = 0; s <= 13; s++) r = d.update(glyph(0), s * 1000);
+    expect(r).toBe(true);
+    expect(d.ticking).toBe(false);
   });
 
   it('停住期間偶爾讀不到時鐘，沿用停住狀態', () => {

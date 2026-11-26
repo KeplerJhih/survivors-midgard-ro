@@ -46,6 +46,8 @@ export interface BotState {
   runner: boolean;
   /** 入口開著時走向的來源（除錯用） */
   enterSrc: string;
+  /** 距上次讀到小地圖幾毫秒（除錯用） */
+  mmAge: number;
   /** 最近 10 次視窗處理（除錯用：辨識成什麼、點哪裡、怎麼點） */
   acts: { t: number; kind: string; x: number; y: number; keep: number; how: string }[];
 }
@@ -236,6 +238,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     altars: [],
     runner: false,
     enterSrc: '-',
+    mmAge: -1,
     acts: [],
   };
 
@@ -635,6 +638,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       if (mvpFight && !vitals.boss && t - lastBossAt > 5000) wonMvpThisRun = true;
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
       const bossSeek = sense.bossSeek.get(t);
+      state.mmAge = Math.round(t - mmSeenAt);
       if (bossSeek && state.activity !== 'target') log?.info('boss: 依小地圖走向首領');
       const altar = busy || bossSeek ? null : seekAltar(t);
       const runner = busy || bossSeek ? null : chaseRunner();
