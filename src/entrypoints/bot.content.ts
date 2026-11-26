@@ -17,6 +17,7 @@ import { parseLayout } from '@/core/vision/layout';
 import { decideByLayout } from '@/core/vision/ui-rules';
 import { findIndicators } from '@/core/vision/indicators';
 import { approachExit, approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
+import { applyAspectLock } from '@/core/display/aspect';
 import { clockGlyph } from '@/core/vision/clock';
 import { approachBeam } from '@/core/vision/loot';
 import { findPortalLabel } from '@/core/vision/portal-label';
@@ -148,10 +149,17 @@ export default defineContentScript({
     });
     const overlay = createOverlay(document);
     let removeTouch: (() => void) | null = null;
+    // 掛機時鎖定畫面比例：畫面辨識只需要認一種版面（視窗形狀因人而異）
+    let unlockAspect: (() => void) | null = null;
 
     const apply = (next: Settings) => {
       if (JSON.stringify(next.game) !== JSON.stringify(settings.game)) gameSync.request();
       settings = next;
+      if (next.bot.enabled && !unlockAspect) unlockAspect = applyAspectLock(window);
+      if (!next.bot.enabled && unlockAspect) {
+        unlockAspect();
+        unlockAspect = null;
+      }
       bot.update(next.bot);
       overlay.setVisible(next.debug);
       // 只有真的偽裝成手機（遊戲進入觸控模式）時才需要滑鼠轉觸控
@@ -247,6 +255,7 @@ export default defineContentScript({
         window.removeEventListener('message', onMessage);
         keyboard.releaseAll();
         removeTouch?.();
+        unlockAspect?.();
         overlay.remove();
       },
     } as BotHandle;
