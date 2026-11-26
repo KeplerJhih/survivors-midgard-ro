@@ -261,7 +261,13 @@ function decideCore(
   // 置中、獨立的亮區塊，且周圍被壓暗（遮罩）→ 對話框；按鈕一律靠右下（ALIGNMENT_END）→ 點右下角
   // 實機：「不存放就離開？」的兩顆小按鈕邊框太淡切不出來，整個對話框被當成一塊
   const dlg = dimmedDialog(f, regions);
-  if (dlg) return { kind: 'dialog', x: dlg.x0 + 0.9 * rw(dlg), y: dlg.y0 + 0.8 * rh(dlg) };
+  if (dlg) {
+    // 對話框內有焦點藍框按鈕（Godot 預設焦點＝主要動作）→ 點它。實機首領寶箱 [全部販賣 (F)][繼續]：
+    // 右下角是空白，每次點兩下沒反應才靠 Enter 備援
+    const focus = focusedButton(f, regions);
+    if (focus && focus.x >= dlg.x0 && focus.x <= dlg.x1 && focus.y >= dlg.y0 && focus.y <= dlg.y1) return { kind: 'dialog', ...focus };
+    return { kind: 'dialog', x: dlg.x0 + 0.9 * rw(dlg), y: dlg.y0 + 0.8 * rh(dlg) };
+  }
 
   // 置中單一寬按鈕（獨自一排）
   const frag = bottomFragment(regions);

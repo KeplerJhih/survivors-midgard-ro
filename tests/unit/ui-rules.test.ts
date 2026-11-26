@@ -368,6 +368,23 @@ describe('decideByLayout（結構判斷）', () => {
     if (a) expect(a.x < 0.414 || a.x > 0.584).toBe(true); // 不點「前往 Prontera」
   });
 
+  it('首領寶箱對話框（背景壓暗）：點有焦點藍框的「繼續」，不點右下角空白', () => {
+    const f = draw([35, 45, 30], [{ x0: 0.26, y0: 0.33, x1: 0.74, y1: 0.7, fill: PANEL }]);
+    // [全部販賣 (F)]（無焦點）與 [繼續]（焦點藍框）
+    const btn = (x0: number, x1: number, frame: RGB) => {
+      const X0 = Math.round(x0 * W), X1 = Math.round(x1 * W), Y0 = Math.round(0.65 * H), Y1 = Math.round(0.69 * H);
+      for (let y = Y0; y < Y1; y++)
+        for (let x = X0; x < X1; x++)
+          if (x <= X0 + 1 || x >= X1 - 2 || y <= Y0 + 1 || y >= Y1 - 2) (f.data as Uint8ClampedArray).set([...frame, 255], (y * W + x) * 4);
+    };
+    btn(0.43, 0.53, [236, 238, 244]); // 邊框淡，切不出來（實機）
+    btn(0.535, 0.575, [90, 110, 220]);
+    const a = decide(f)!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeCloseTo(0.555, 1);
+    expect(a.y).toBeCloseTo(0.67, 1);
+  });
+
   it('MVP 巢穴的淺色石板地（滿版亮區）＋下方技能列的藍色圖示 → 不是視窗、不點技能列', () => {
     // 實機：Glast Heim 墓園巢穴打贏後，地面被切成 (0,0.38)~(1,1) 的大面板，焦點規則把技能列藍框當「繼續」一直點、卡著不去出口
     const f = draw(GRASS, [{ x0: 0, y0: 0.38, x1: 1, y1: 1, fill: [200, 200, 196] }]);
