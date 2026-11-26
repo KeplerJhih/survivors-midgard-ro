@@ -508,7 +508,7 @@ describe('追目標撞牆', () => {
     expect(bot.state.activity).toBe('target');
     expect(bot.state.dirs).toEqual(['down']);
     wall = true;
-    run(3000);
+    run(2500); // 2 秒沒動 → 第一段繞路（0.9 秒）
     expect(['left', 'right']).toContain(bot.state.dirs[0]);
   });
 });

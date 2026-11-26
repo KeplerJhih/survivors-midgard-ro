@@ -108,7 +108,9 @@ const EXIT_COAST_MS = 3000;
 const EXIT_WAIT_MS = 12000;
 /** 走向傳送門時畫面靜止多久＝撞牆 → 往側邊繞 DETOUR_MS */
 const STUCK_MS = 1500;
-const DETOUR_MS = 2000;
+// 先短後長（0.9 → 1.8 → 2.7 → 3.6 秒，左右輪流）：缺口常在旁邊一點點（實機：Glast Heim 兩座塔之間，
+// 往下 0.7 秒再往右就過；原本 2/4/6 秒一繞就繞過頭，上下來回 12 秒都沒試到缺口）
+const DETOUR_MS = 900;
 /** 小地圖上移動超過這麼多像素才算有在走；按著方向鍵 MINIMAP_STUCK_MS 都沒超過＝撞牆 */
 const MINIMAP_MOVE_PX = 2;
 /** 祭壇：小地圖上離祭壇中心這麼近就站著等觸發；多久沒成功就放棄 */
@@ -688,7 +690,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         else if (stuck && want.length) {
           mmMovedAt = t;
           // 連續卡住（上次繞完 10 秒內）→ 換邊且繞更久（2 → 4 → 6 秒），長牆也繞得出去
-          detourStreak = t - detourUntil < 10000 ? Math.min(3, detourStreak + 1) : 1;
+          detourStreak = t - detourUntil < 10000 ? Math.min(4, detourStreak + 1) : 1;
           detourCw = !detourCw;
           detourDirs = want.map((d) => TURN[detourCw ? 'cw' : 'ccw'][d]);
           detourUntil = t + DETOUR_MS * detourStreak;
