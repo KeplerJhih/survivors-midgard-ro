@@ -80,6 +80,8 @@ export interface BotDeps {
   approachSwirl?: () => Dir[] | null;
   /** MVP 勝利後走向淡藍出口 */
   approachExit?: () => Dir[] | null;
+  /** MVP 入口 / 出口頭上的名稱（淡粉白字，被擋住也看得到）→ 傳送門位置（相對畫面中心、以畫面高度正規化） */
+  portalLabel?: () => { x: number; y: number } | null;
   /** 走向地上掉落物光柱（卡片等）的方向 */
   approachLoot?: () => Dir[] | null;
   /** 低解析度整張畫面（靜止偵測：辨識不到的視窗讓遊戲暫停時按 Enter） */
@@ -346,6 +348,14 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     frozen: throttle(INTERVAL.clock, () => (deps.clockGlyph ? clock.update(deps.clockGlyph(), now()) : false), false),
     approach: throttle(INTERVAL.swirl, () => deps.approachSwirl?.() ?? null, null as Dir[] | null),
     exit: throttle(INTERVAL.swirl, () => deps.approachExit?.() ?? null, null as Dir[] | null),
+    label: throttle(
+      INTERVAL.swirl,
+      () => {
+        const p = deps.portalLabel?.() ?? null;
+        return p ? dirsFromAngle(Math.atan2(-p.y, p.x)) : null;
+      },
+      null as Dir[] | null,
+    ),
     swirl: throttle(INTERVAL.swirl, () => (config.seekTargets ? deps.fleeSwirl?.() ?? null : null), null as Dir[] | null),
     danger: throttle(INTERVAL.danger, () => (config.dodge ? deps.probeDanger?.() ?? null : null), null as DangerProbes | null),
   };
@@ -356,7 +366,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
    */
   let lastExit: { dirs: Dir[]; at: number } | null = null;
   const exitApproach = (t: number): Dir[] | null => {
-    const d = sense.pointer.get(t) ?? sense.exit.get(t);
+    // 名稱（與出口顏色、語言無關，被擋住也畫在最上層）優先於淡藍光；因果路線傳送門名稱是金 / 紅色，不會認錯
+    const d = sense.pointer.get(t) ?? sense.label.get(t) ?? sense.exit.get(t);
     if (d) {
       lastExit = { dirs: d, at: t };
       return d;
@@ -400,6 +411,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     if (p) lastPointer = { dirs: p, at: t };
     else if (lastPointer && t - lastPointer.at < POINTER_COAST_MS) return (state.enterSrc = 'pointer~'), lastPointer.dirs;
     if (p) return (searchStart = null), (state.enterSrc = 'pointer'), p;
+    // 入口在畫面上：看頭上的名稱（固定淡粉白，與 MVP 種類無關；實機 Dark Lord 入口光淡又細，光的判斷認不出）
+    const l = sense.label.get(t);
+    if (l) return (searchStart = null), (state.enterSrc = 'label'), l;
     const g = sense.approach.get(t);
     if (g) return (searchStart = null), (state.enterSrc = 'glow'), g;
     const h = backToPortalHome();

@@ -20,8 +20,8 @@ const HUD = [
   { x0: 0.38, y0: 0.84, x1: 0.7, y1: 1 },
 ];
 
-/** 名稱底部到傳送門中心的距離（畫面高度比例；實機量測） */
-export const LABEL_TO_PORTAL = 0.07;
+/** 名稱底部到傳送門中心的距離（畫面高度比例；實機 1568×713：名稱底 147px、光圈中心 190px） */
+export const LABEL_TO_PORTAL = 0.06;
 
 /**
  * 找傳送門名稱，回傳傳送門位置（相對畫面中心，以畫面高度正規化，與 findPortalGlow 一致）。
@@ -56,16 +56,22 @@ export function findPortalLabel(f: Frame): { x: number; y: number } | null {
     }
   const seen = new Uint8Array(W * H);
   let best: { n: number; x0: number; x1: number; y1: number; sx: number } | null = null;
+  // 文字核心是原色 (255,229,255)（實機）；特效、傷害數字混到相近比例但沒有這麼亮的核心
+  const core = (p: number) => data[p * 4]! >= 240 && data[p * 4 + 2]! >= 240;
   const stack: number[] = [];
   for (let p0 = 0; p0 < W * H; p0++) {
     if (!m[p0] || seen[p0]) continue;
     seen[p0] = 1;
     stack.push(p0);
-    let n = 0, sx = 0, x0 = W, x1 = 0, y0 = H, y1 = 0;
+    let n = 0, sx = 0, x0 = W, x1 = 0, y0 = H, y1 = 0, c = 0;
     while (stack.length) {
       const p = stack.pop()!;
       const x = p % W, y = (p / W) | 0;
-      if (hit[p]) (n++, (sx += x));
+      if (hit[p]) {
+        n++;
+        sx += x;
+        if (core(p)) c++;
+      }
       if (x < x0) x0 = x;
       if (x > x1) x1 = x;
       if (y < y0) y0 = y;
@@ -79,7 +85,8 @@ export function findPortalLabel(f: Frame): { x: number; y: number } | null {
     }
     const w = (x1 - x0 + 1) / H, h = (y1 - y0 + 1) / H;
     // 一行文字：高 0.015~0.07H、寬至少 2 倍高；筆畫像素夠多
-    if (h < 0.015 || h > 0.07 || w < 2 * h || n < 6) continue;
+    // 實機名稱（「傳送門：Dark Lord」，640 寬取樣）：45 px、核心 ≥ 3
+    if (h < 0.015 || h > 0.07 || w < 2 * h || n < 20 || c < 3) continue;
     if (!best || n > best.n) best = { n, x0, x1, y1, sx };
   }
   if (!best) return null;

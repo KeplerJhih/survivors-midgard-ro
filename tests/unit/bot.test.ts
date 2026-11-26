@@ -1196,3 +1196,34 @@ describe('入口指示圓盤 / 重新載入', () => {
     expect(bot.state.enterSrc).not.toBe('circle');
   });
 });
+
+describe('入口在畫面上：看名稱', () => {
+  it('入口開著、看得到入口名稱 → 往名稱下方的傳送門走（不靠光）', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        portalLabel: () => (frozenClock ? { x: 0.36, y: -0.22 } : null),
+        approachSwirl: () => ['down'],
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(5000);
+    expect(bot.state.enterSrc).toBe('label');
+    expect(bot.state.dirs).toEqual(['right', 'up']);
+  });
+});

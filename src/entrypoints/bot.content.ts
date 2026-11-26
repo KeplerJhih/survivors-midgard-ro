@@ -19,6 +19,7 @@ import { findIndicators } from '@/core/vision/indicators';
 import { approachExit, approachSwirl, fleeSwirl, probeDanger } from '@/core/vision/danger';
 import { clockGlyph } from '@/core/vision/clock';
 import { approachBeam } from '@/core/vision/loot';
+import { findPortalLabel } from '@/core/vision/portal-label';
 import { bossBar, readHp } from '@/core/vision/hud';
 import { findMinimapSquare, MINIMAP_REGION, readMinimap } from '@/core/vision/minimap';
 
@@ -100,6 +101,10 @@ export default defineContentScript({
       approachSwirl: () => {
         const frame = sample();
         return frame ? approachSwirl(frame) : null;
+      },
+      portalLabel: () => {
+        const frame = sampleUI();
+        return frame ? findPortalLabel(frame) : null;
       },
       approachExit: () => {
         const frame = sample();
