@@ -103,7 +103,9 @@ export function keepTiles(regions: Region[], aspect: number): { x: number; y: nu
     const h = rh(r);
     const ratio = (rw(r) * aspect) / h;
     // 只看下半部：上方角色面板的技能圖示也是一排近正方形小圖
-    return r.y0 >= 0.55 && h >= 0.04 && h <= 0.11 && ratio >= 0.6 && ratio <= 1.5 && r.kind !== 'button';
+    // 最下排按鈕列（選擇目的地 / 再玩一次 / 前往 Prontera）在 0.92 以下；物品格底邊實機 0.83~0.86
+    // （實機：結算頁被暗化時把底部按鈕殘片當物品格 → 點到按鈕列、之後誤點「前往 Prontera」回城）
+    return r.y0 >= 0.55 && r.y1 <= 0.9 && h >= 0.04 && h <= 0.11 && ratio >= 0.6 && ratio <= 1.5 && r.kind !== 'button';
   });
   // 以底邊分排，取最多格的一排（≥ 4 格、寬度相近）
   const groups: Region[][] = [];
@@ -239,7 +241,12 @@ function decideCore(
   if (bottom && bottom.length === 2) {
     // 不限置中：任務 NPC 視窗在左側（[先不要][我來幫忙！]）
     const p = container(bottom);
-    if (p && !isWide(p)) return tap('dialog', bottom[1]!);
+    // 有焦點藍框的那顆優先（Godot 預設焦點＝遊戲預設選項）。實機：結算頁「不存放裝備？」視窗
+    // [重新選擇][仍要離開]，焦點在左邊重新選擇（ui/menus.gd back.grab_focus）；原本固定點右邊 → 裝備全丟、回城
+    if (p && !isWide(p)) {
+      const focused = bottom.filter((b) => hasFocusFrame(f, b));
+      return tap('dialog', focused.length === 1 ? focused[0]! : bottom[1]!);
+    }
   }
   // 小面板內上下疊兩顆等寬的寬按鈕（MVP 勝利「繼續無盡模式／結束本局」）→ 點上面那顆（遊戲預設焦點、主要選項）
   const stacked = stackedPair(regions, buttons) ?? mergedStack(regions);
@@ -298,6 +305,25 @@ function decideCore(
  * 內部與面板同色 → 版面切不出任何東西；只有預設焦點的「繼續」有明顯藍框 (b-r ≥ 40)。
  * 在置中大視窗底部 25% 找藍框外框（寬 2~25%、高 1.5~10%），取最下面的點中心。
  */
+/** 按鈕外框（往外 1~3px）有 Godot 焦點藍框 (b ≥ 150、b-r ≥ 40、b-g ≥ 20) */
+function hasFocusFrame(f: Frame, r: Region): boolean {
+  const { width: W, height: H, data } = f;
+  const x0 = Math.round(r.x0 * W), x1 = Math.round(r.x1 * W), y0 = Math.round(r.y0 * H), y1 = Math.round(r.y1 * H);
+  let n = 0, tot = 0;
+  const at = (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= W || y >= H) return;
+    tot++;
+    const i = (y * W + x) * 4;
+    const R = data[i]!, G = data[i + 1]!, B = data[i + 2]!;
+    if (B >= 150 && B - R >= 40 && B - G >= 20) n++;
+  };
+  for (let d = 0; d <= 3; d++) {
+    for (let x = x0; x < x1; x++) (at(x, y0 - d), at(x, y1 - 1 + d));
+    for (let y = y0; y < y1; y++) (at(x0 - d, y), at(x1 - 1 + d, y));
+  }
+  return tot > 0 && n >= 0.15 * tot;
+}
+
 function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | null {
   const box = regions.find(
     (r) => (r.kind === 'panel' || r.kind === 'card') && Math.abs(cx(r) - 0.5) < 0.06 && rw(r) * rh(r) >= 0.15 && r.fill >= 0.5,

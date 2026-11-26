@@ -80,6 +80,8 @@ export interface BotDeps {
   approachSwirl?: () => Dir[] | null;
   /** MVP 勝利後走向淡藍出口 */
   approachExit?: () => Dir[] | null;
+  /** 「這局打倒過 MVP」跨外掛重新載入保存（頁面不重新整理就還在） */
+  wonMvp?: { get(): boolean; set(v: boolean): void };
   /** MVP 入口 / 出口頭上的名稱（淡粉白字，被擋住也看得到）→ 傳送門位置（相對畫面中心、以畫面高度正規化） */
   portalLabel?: () => { x: number; y: number } | null;
   /** 走向地上掉落物光柱（卡片等）的方向 */
@@ -169,7 +171,12 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let lastEnter = -Infinity;
   let lastSyncRequest = -Infinity;
   /** 這局打倒過 MVP（結算頁可免費帶 3 件回倉庫）、已帶幾件 */
-  let wonMvpThisRun = false;
+  // 重新載入外掛時沿用（實機：打倒 MVP 後更新外掛 → 結算頁不知道能免費帶 3 件，一件都沒帶）
+  let wonMvpThisRun = deps.wonMvp?.get() ?? false;
+  const setWon = (v: boolean) => {
+    if (wonMvpThisRun !== v) deps.wonMvp?.set(v);
+    wonMvpThisRun = v;
+  };
   let keepTaken = 0;
   /** 目前分頁（以按下的分頁 x 位置識別）、這頁點了幾格、試過切到哪些分頁 */
   let keepPage: number | null = null;
@@ -568,7 +575,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           log?.info('screen: 點擊', act);
           void pointer.tap(act.x, act.y);
           if (act.kind === 'result') {
-            wonMvpThisRun = false; // 離開結算頁＝下一局重新計
+            setWon(false); // 離開結算頁＝下一局重新計
             keepTaken = 0;
             keepPage = null;
             keepPageTaps = 0;
@@ -660,7 +667,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 低血量時撤退優先（實機：勝利選擇後回到地圖仍在找出口，HP 9% 照樣亂走）
       const exitSeek = mvpFight && !vitals.boss && !vitals.lowHp;
       // 首領血條消失 5 秒以上才算打倒（短暫讀不到血條不算；沒打倒的結算頁帶回要付 zeny）
-      if (mvpFight && !vitals.boss && t - lastBossAt > 5000) wonMvpThisRun = true;
+      if (mvpFight && !vitals.boss && t - lastBossAt > 5000) setWon(true);
       const busy = portal || vitals.lowHp || vitals.boss || frozen || exitSeek;
       const bossSeek = sense.bossSeek.get(t);
       state.mmAge = Math.round(t - mmSeenAt);

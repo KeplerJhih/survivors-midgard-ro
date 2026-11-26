@@ -102,6 +102,10 @@ export default defineContentScript({
         const frame = sample();
         return frame ? approachSwirl(frame) : null;
       },
+      wonMvp: {
+        get: () => !!(window as unknown as { __msbotWon?: boolean }).__msbotWon,
+        set: (v) => void ((window as unknown as { __msbotWon?: boolean }).__msbotWon = v),
+      },
       portalLabel: () => {
         const frame = sampleUI();
         return frame ? findPortalLabel(frame) : null;

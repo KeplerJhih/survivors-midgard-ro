@@ -1227,3 +1227,25 @@ describe('入口在畫面上：看名稱', () => {
     expect(bot.state.dirs).toEqual(['right', 'up']);
   });
 });
+
+describe('破關帶回：外掛重新載入後仍記得打倒過 MVP', () => {
+  it('wonMvp.get() 為 true → 結算頁先帶物品再點再玩一次', () => {
+    let t = 0;
+    const taps: string[] = [];
+    const store = { v: true };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () => ({ kind: 'result', x: 0.47, y: 0.94, keep: [{ x: 0.3, y: 0.8 }, { x: 0.34, y: 0.8 }, { x: 0.38, y: 0.8 }], keepTabs: [] }),
+        pointer: { tap: async (x) => void taps.push(`${x}`) },
+      },
+    );
+    for (let e = 0; e < 20000; e += 250) (t += 250), bot.tick();
+    expect(taps.slice(0, 4)).toEqual(['0.3', '0.34', '0.38', '0.47']);
+    expect(store.v).toBe(false); // 點了再玩一次 → 清掉
+  });
+});

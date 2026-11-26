@@ -138,6 +138,17 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.x).toBeCloseTo(0.595, 1);
   });
 
+  it('確認框：左邊按鈕有焦點藍框（「不存放裝備？」的重新選擇）→ 點左邊，不點右邊的仍要離開', () => {
+    const f = draw([40, 45, 30], [
+      { x0: 0.36, y0: 0.45, x1: 0.64, y1: 0.6, fill: PANEL },
+      { x0: 0.48, y0: 0.54, x1: 0.55, y1: 0.585, fill: BTN, border: [70, 110, 230] },
+      { x0: 0.56, y0: 0.54, x1: 0.63, y1: 0.585, fill: BTN },
+    ]);
+    const a = decide(f)!;
+    expect(a.kind).toBe('dialog');
+    expect(a.x).toBeCloseTo(0.515, 1);
+  });
+
   it('被壓暗背景上的置中對話框（按鈕切不出來）→ 點右下角', () => {
     const f = draw([110, 112, 118], [{ x0: 0.366, y0: 0.513, x1: 0.634, y1: 0.592, fill: PANEL }]);
     const a = decide(f)!;
@@ -414,6 +425,11 @@ describe('結算頁帶回 Kafra 倉庫物品格', () => {
     const k = keepTiles([card, item, ...tabs], 1920 / 873);
     expect(k).toHaveLength(1);
     expect(k[0]!.y).toBeCloseTo(0.823, 2);
+  });
+
+  it('最下排按鈕列的殘片（底邊 > 0.9）不當物品格', () => {
+    const frag = { kind: 'other' as const, x0: 0.45, y0: 0.92, x1: 0.478, y1: 0.959, fill: 0.6, luma: 240 };
+    expect(keepTiles([frag], 1568 / 713)).toEqual([]);
   });
 
   it('上半部的技能圖示列不算', () => {
