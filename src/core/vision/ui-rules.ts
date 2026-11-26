@@ -70,9 +70,55 @@ export function decideByLayout(
 ): ScreenAction | null {
   const act = decideCore(f, regions, rarity, opts);
   if (act?.kind !== 'result') return act;
-  const keep = keepTiles(regions, f.width / f.height);
-  if (!keep.length) return act;
-  return { ...act, keep, keepTabs: keepTabs(regions, keep) };
+  const found = keepTiles(regions, f.width / f.height);
+  if (!found.length) return act;
+  // 往左推不超出包住物品列的大面板（面板外是遊戲畫面，起伏也大）
+  const box = regions
+    .filter((r) => r.x0 <= found[0]!.x && r.x1 >= found[0]!.x && r.y0 <= found[0]!.y && r.y1 >= found[0]!.y && rw(r) * rh(r) >= 0.2)
+    .sort((a, b) => rw(b) * rh(b) - rw(a) * rh(a))[0];
+  const keep = extendKeepLeft(f, found, box ? box.x0 : 0.03);
+  return { ...act, keep, keepTabs: keepTabs(regions, found) };
+}
+
+/**
+ * 物品格常有一部分切不出來（相鄰格、角標黏在一起；實機 17 格只切出中間 5 格 → 點到中間、評分最高的左邊幾格沒帶）。
+ * 用切出的格距往左一格一格推：那格的亮度起伏夠大（有物品圖示）就補上，碰到平坦的面板底色就停。
+ */
+function extendKeepLeft(f: Frame, keep: { x: number; y: number; w?: number }[], minX: number): { x: number; y: number }[] {
+  if (keep.length < 2) return keep;
+  const gaps = keep.slice(1).map((k, i) => k.x - keep[i]!.x).sort((a, b) => a - b);
+  let pitch = gaps[gaps.length >> 1]!;
+  // 切出的格子可能隔一格才有一個（實機格距算成 0.105、實際 0.05）→ 用格寬校正：格距約 1.25 倍格寬
+  const ws = keep.map((k) => k.w ?? 0).filter((w) => w > 0).sort((a, b) => a - b);
+  const tileW = ws.length ? ws[ws.length >> 1]! : 0;
+  if (tileW > 0 && pitch > 1.7 * tileW) pitch = pitch / Math.max(1, Math.round(pitch / (1.25 * tileW)));
+  if (pitch <= 0.01 || pitch > 0.12) return keep;
+  const { width: W, height: H, data } = f;
+  const halfW = 0.35 * pitch;
+  const halfH = (halfW * W) / H;
+  const busy = (cx: number, cy: number) => {
+    const x0 = Math.round((cx - halfW) * W), x1 = Math.round((cx + halfW) * W);
+    const y0 = Math.round((cy - halfH) * H), y1 = Math.round((cy + halfH) * H);
+    if (x0 < 0 || y0 < 0 || x1 >= W || y1 >= H) return false;
+    let n = 0, sum = 0, sq = 0;
+    for (let y = y0; y <= y1; y++)
+      for (let x = x0; x <= x1; x++) {
+        const i = (y * W + x) * 4;
+        const l = 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
+        n++;
+        sum += l;
+        sq += l * l;
+      }
+    const mean = sum / n;
+    return Math.sqrt(Math.max(0, sq / n - mean * mean)) > 25;
+  };
+  const out = [...keep];
+  const y = keep[0]!.y;
+  for (let x = keep[0]!.x - pitch; x - halfW > minX + 0.005 && out.length < keep.length + 20; x -= pitch) {
+    if (!busy(x, y)) break;
+    out.unshift({ x, y });
+  }
+  return out;
 }
 
 /**
@@ -98,7 +144,7 @@ export function keepTabs(regions: Region[], keep: { x: number; y: number }[]): {
  * 實機（1568×713）：格高 0.069H、寬 0.03W（≈正方形）、16 格排一列。
  * 倉庫已有同款的格子右上角有「x1」標籤，外框往上凸出 → 頂端比整排高出一截者排除（不靠顏色）。
  */
-export function keepTiles(regions: Region[], aspect: number): { x: number; y: number }[] {
+export function keepTiles(regions: Region[], aspect: number): { x: number; y: number; w?: number }[] {
   const cand = regions.filter((r) => {
     const h = rh(r);
     const ratio = (rw(r) * aspect) / h;
@@ -136,7 +182,7 @@ export function keepTiles(regions: Region[], aspect: number): { x: number; y: nu
     // 「x1」標籤讓頂端高出約 0.031；被上方篩選鈕黏住只高 0.017（實機）→ 門檻 0.02
     .filter((r) => Math.abs(rw(r) - medW) <= medW * 0.35 && r.y0 >= medTop - 0.02)
     .sort((a, b) => a.x0 - b.x0)
-    .map((r) => ({ x: cx(r), y: cy(r) }));
+    .map((r) => ({ x: cx(r), y: cy(r), w: rw(r) }));
 }
 
 function decideCore(

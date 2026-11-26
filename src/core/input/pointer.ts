@@ -24,6 +24,9 @@ export function createPointer(canvas: HTMLElement, isTouch: () => boolean): Poin
         canvas.dispatchEvent(make('touchstart'));
         await sleep(80);
         canvas.dispatchEvent(make('touchend'));
+        // 觸控模式也會留下游標位置 → 物品說明框蓋住結算頁（實機 Chain [3]）→ 一樣移到最上緣
+        await sleep(30);
+        canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: r.left + 0.5 * r.width, clientY: r.top + 1, bubbles: true, cancelable: true }));
       } else {
         const opts = { clientX: x, clientY: y, button: 0, bubbles: true, cancelable: true };
         canvas.dispatchEvent(new MouseEvent('mousemove', opts));
