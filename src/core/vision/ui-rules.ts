@@ -449,7 +449,12 @@ function hasFocusFrame(f: Frame, r: Region): boolean {
 function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | null {
   const box = regions.find(
     // 寬 < 0.95：視窗不會貼滿左右兩側；實機 MVP 巢穴淺色石板地被切成滿版面板 → 把技能列藍框當「繼續」一直點
-    (r) => (r.kind === 'panel' || r.kind === 'card') && Math.abs(cx(r) - 0.5) < 0.06 && rw(r) < 0.95 && rw(r) * rh(r) >= 0.15 && r.fill >= 0.5,
+    // 內容多的視窗（任務 NPC：頭像、獎勵列）填滿率低、被歸為 other（實機 Sir Aldo 任務 0.37）→ 也收，但要有一點高度餘裕（不是滿版地面）
+    (r) =>
+      Math.abs(cx(r) - 0.5) < 0.06 &&
+      rw(r) < 0.95 &&
+      rw(r) * rh(r) >= 0.15 &&
+      (((r.kind === 'panel' || r.kind === 'card') && r.fill >= 0.5) || (r.kind === 'other' && r.fill >= 0.3 && rh(r) <= 0.9)),
   );
   return box ? focusedButtonIn(f, box, 0.25) : null;
 }

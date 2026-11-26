@@ -264,6 +264,23 @@ describe('decideByLayout（結構判斷）', () => {
     expect(a.y).toBeCloseTo(0.94, 1);
   });
 
+  it('任務 NPC 視窗內容多（填滿率低、切成 other）→ 點右下有焦點藍框的「我來幫忙！」（實機 Sir Aldo）', () => {
+    const DARK: RGB = [70, 60, 50];
+    const FOCUS: RGB = [77, 107, 199];
+    const f = draw(GRASS, [
+      { x0: 0.256, y0: 0.086, x1: 0.744, y1: 0.904, fill: PANEL }, // 視窗
+      { x0: 0.27, y0: 0.12, x1: 0.73, y1: 0.4, fill: DARK }, // 頭像、對話（壓低填滿率）
+      { x0: 0.27, y0: 0.6, x1: 0.73, y1: 0.75, fill: DARK },
+      { x0: 0.6, y0: 0.855, x1: 0.66, y1: 0.895, fill: BTN }, // 先不要（無焦點）
+      { x0: 0.672, y0: 0.852, x1: 0.742, y1: 0.898, fill: FOCUS, border: FOCUS }, // 我來幫忙！的焦點框
+      { x0: 0.676, y0: 0.858, x1: 0.738, y1: 0.892, fill: BTN, border: BTN },
+    ], 291);
+    const a = decideByLayout(f, parseLayout(f))!;
+    expect(a).not.toBeNull();
+    expect(a.x).toBeCloseTo(0.707, 1);
+    expect(a.y).toBeCloseTo(0.875, 1);
+  });
+
   it('底部 HUD 的寬條（已保留寶箱 [開啟]）不當成寬按鈕', () => {
     const f = draw(GRASS, [{ x0: 0.42, y0: 0.86, x1: 0.67, y1: 0.93, fill: BTN }]);
     expect(decide(f)).toBeNull();
