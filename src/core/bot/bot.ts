@@ -168,6 +168,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let hpSeenAt = -Infinity;
   let recoverSince: number | null = null;
   let lastBossAt = -Infinity;
+  /** 時鐘停住期間小地圖位置跳動（走進巢穴＝傳送）的時間；最後一次時鐘在走的時間 */
+  let lairJumpAt = -Infinity;
+  let tickingAt = -Infinity;
   /** 目前這個視窗已點過幾次（視窗消失即歸零） */
   let windowTaps = 0;
   /** 靜止開始時是否在對局中（null＝畫面在動） */
@@ -322,6 +325,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           lairDialog = false;
           log?.info('minimap: 位置跳動＝已離開巢穴，停止找出口');
         }
+        if (mmLast && state.frozen && Math.hypot(m.player.x - mmLast.player.x, m.player.y - mmLast.player.y) > MAP_JUMP_PX)
+          lairJumpAt = now();
         mmSeenAt = now();
         mmLast = m;
         state.altars = (m.altars ?? []).map((a) => a.id);
@@ -661,6 +666,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const vitals = sense.vitals.get(t);
       const portal = sense.portal.get(t);
       const frozen = sense.frozen.get(t);
+      if (!frozen) tickingAt = t;
       state.frozen = frozen;
       // 入口開啟位置：只有「看著時鐘停下」才知道（重新載入外掛時入口早就開了，當下位置不是入口開啟處）
       if (frozen && !wasFrozen && !mvpFight)
@@ -674,7 +680,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 一般首領戰中時鐘停住一定是視窗暫停（實機：寶箱視窗讓時鐘停 → 被當成巢穴，打完在地圖上找出口亂轉）；
         // 巢穴內時鐘停住時沒有視窗 → 最近 5 秒沒看到視窗才算巢穴。
         // （原本「連續停 4 秒」不可靠：進巢穴的載入畫面讀不到時鐘，停住判定中斷重算 → Glast Heim 巢穴勝利後沒進入找出口）
-        if (frozen && t - lastWindowAt > LAIR_NO_WINDOW_MS) {
+        // 小地圖讀得到時還要看過「時鐘停住後傳送」（走進巢穴）：原地圖首領戰中寶箱視窗讓時鐘停 → 視窗收掉後
+        // 時鐘還沒恢復、又剛好 5 秒沒認到視窗 → 被當成巢穴，打完在原地圖「找出口」不打怪（實機）
+        const enteredLair = t - mmSeenAt > 3000 || lairJumpAt >= tickingAt;
+        if (frozen && t - lastWindowAt > LAIR_NO_WINDOW_MS && enteredLair) {
           mvpFight = true;
           portalHome = null; // 已進巢穴（另一張地圖），入口位置作廢
           lastExit = null;

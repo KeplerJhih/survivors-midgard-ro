@@ -1267,6 +1267,44 @@ describe('巢穴：時鐘剛停住首領就出現（載入後立刻開打）', (
   });
 });
 
+describe('原地圖首領戰中時鐘停住（寶箱視窗）', () => {
+  it('小地圖沒看到傳送（沒進巢穴）→ 首領打完不找出口', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let bar = 0;
+    const p = { x: 40, y: 40 };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        bossBar: () => bar,
+        approachExit: () => ['up'],
+        readMinimap: () => ({ player: { ...p }, boss: null }),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    bar = 0.003;
+    run(2000);
+    frozenClock = true; // 時鐘停住，但角色沒傳送（仍在原地圖）
+    for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
+    bar = 0;
+    frozenClock = false;
+    run(6000);
+    expect(bot.state.activity).not.toBe('enter');
+  });
+});
+
 describe('出巢穴回原地圖', () => {
   it('小地圖位置跳動（傳送）→ 不再找出口，即使原地圖首領血條一直出現', () => {
     let t = 0;
@@ -1297,6 +1335,8 @@ describe('出巢穴回原地圖', () => {
     run(4000);
     frozenClock = true;
     run(3500);
+    p = { x: 10, y: 70 }; // 走進入口 → 傳送到巢穴
+    run(1000);
     bar = 0.003;
     for (let i = 0; i < 10; i++) (bar -= 0.0001), run(500);
     bar = 0;
