@@ -862,6 +862,43 @@ describe('入口開著、畫面上找不到入口（暗色地圖）', () => {
   });
 });
 
+describe('入口名稱時有時無', () => {
+  it('名稱每 3 次取樣有 1 次被擋住 → 一直朝名稱方向走，不改去別的方向', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let k = 0;
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        portalLabel: () => (k++ % 3 === 2 ? null : { x: 0.4, y: 0 }), // 入口在右邊
+        approachSwirl: () => ['left'], // 別的亮光在左邊
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) (t += 250), bot.tick();
+    };
+    run(4000);
+    frozenClock = true;
+    run(4000);
+    const seen = new Set<string>();
+    for (let e = 0; e < 6000; e += 250) {
+      t += 250;
+      bot.tick();
+      seen.add(bot.state.dirs.join('+'));
+    }
+    expect([...seen]).toEqual(['right']);
+  });
+});
+
 describe('誤判的視窗（點不掉）', () => {
   it('入口開著時地板一直被當成確認框 → 點 12 次後暫停處理視窗，角色去找入口', () => {
     let t = 0;

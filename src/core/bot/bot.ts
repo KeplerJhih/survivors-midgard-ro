@@ -514,7 +514,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     // 名稱優先於指示圓盤：看得到名稱時入口就在畫面上，此時的「圓盤」多半是任務「!」等其他指示
     // （實機：入口在左、名稱看得到，卻追右下的任務圓盤）。名稱誤判（粉紅催眠漩渦）已用黑框檢查排除
     const l = sense.label.get(t);
-    if (l) return (searchStart = null), (lastPointer = null), (state.enterSrc = 'label'), l;
+    if (l) return (searchStart = null), (lastPointer = null), (lastLabel = { dirs: l, at: t }), (state.enterSrc = 'label'), l;
+    // 名稱也會閃（被樹幹、特效擋住一兩筆）→ 3 秒內沿名稱最後的方向走，不馬上改成回入口位置 / 圓盤
+    // （實機 Turtle Island：入口在樹幹右上，名稱時有時無 → 名稱與「回入口位置」兩個方向交替，繞路計數一直重來，卡 1 分多鐘）
+    if (lastLabel && t - lastLabel.at < POINTER_COAST_MS) return (state.enterSrc = 'label~'), lastLabel.dirs;
     const p = sense.pointer.get(t);
     if (p) lastPointer = { dirs: p, at: t };
     else if (lastPointer && t - lastPointer.at < POINTER_COAST_MS) return (state.enterSrc = 'pointer~'), lastPointer.dirs;
@@ -538,6 +541,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
    */
   let searchStart: number | null = null;
   let lastPointer: { dirs: Dir[]; at: number } | null = null;
+  let lastLabel: { dirs: Dir[]; at: number } | null = null;
   const circleSearch = (t: number): Dir[] => {
     if (searchStart === null) searchStart = t;
     let e = t - searchStart;
