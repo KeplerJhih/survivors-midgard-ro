@@ -201,6 +201,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let resultSeenAt = -Infinity;
   let resultLeftPending = false;
   let storageFull = false;
+  /** 結算頁按了離開卻被「不存放就離開？」退回的次數 */
+  let resultBounces = 0;
   const keepTabTried = new Set<number>();
   const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
     const tabs = act.keepTabs ?? [];
@@ -310,6 +312,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           keepWaits = 0;
           resultFirstAt = null;
           storageFull = false;
+          resultBounces = 0;
           keepFewWaits = 0;
           keepTappedX.length = 0;
           keepTabTried.clear();
@@ -636,7 +639,18 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         state.lastScreen = act.kind;
         // 點了幾次視窗還在（畫面大小不同時按鈕位置可能算偏）→ 與點擊交替按 Enter（預設焦點按鈕）。
         // 腐化寶箱（預設焦點 Hel）、結算頁（焦點不一定是再玩一次）、轉職選右邊（預設焦點是左邊）不按
+        // 結算頁按了離開卻跳「不存放就離開？」＝遊戲說還能帶（只有打倒過 MVP 才會跳）
+        // 實機：重新整理頁面後外掛不知道打倒過 MVP → 不帶、一直在結算頁與這個視窗間來回
+        // → 補上旗標，退回後就去帶；帶了還一直被退回（點沒生效）→ 第 3 次起點「仍要離開」
+        const bounced = act.kind === 'dialog' && resultLeftPending && !storageFull;
+        if (bounced) {
+          resultBounces++;
+          if (!wonMvpThisRun) log?.info('result: 被退回＝打倒過 MVP，補帶物品');
+          setWon(true);
+        }
+        const leaveAnyway = act.kind === 'dialog' && resultLeftPending && !!act.alt && (storageFull || resultBounces >= 3);
         const enter =
+          !leaveAnyway &&
           windowTaps >= TAPS_BEFORE_ENTER &&
           windowTaps % 2 === 1 &&
           act.kind !== 'corrupt' &&
@@ -671,8 +685,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           void keyboard.tap('enter');
         } else {
           // 倉庫已滿、結算頁按了離開 →「不存放就離開？」點「仍要離開」（預設焦點是重新選擇，會一直退回結算頁）
-          const target = act.kind === 'dialog' && storageFull && resultLeftPending && act.alt ? act.alt : act;
-          log?.info('screen: 點擊', act, target === act ? '' : '（倉庫已滿：仍要離開）');
+          const target = leaveAnyway ? act.alt! : act;
+          log?.info('screen: 點擊', act, target === act ? '' : '（仍要離開）');
           void pointer.tap(target.x, target.y);
           // 點了結算頁的按鈕不代表離開：沒帶滿 3 件會跳「不存放就離開？」、Enter 退回結算頁
           // （實機：在這裡就清掉「打倒過 MVP」→ 剩下 2 件不再帶、一直點再玩一次原地打轉）

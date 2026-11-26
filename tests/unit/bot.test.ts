@@ -1271,6 +1271,50 @@ describe('帶回物品：依位置挑最左邊沒點過的格子', () => {
   });
 });
 
+describe('「不存放就離開？」退回結算頁', () => {
+  const run = (won: boolean) => {
+    let t = 0;
+    let stage: 'result' | 'confirm' = 'result';
+    const taps: string[] = [];
+    const store = { v: won };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () =>
+          stage === 'confirm'
+            ? { kind: 'dialog', x: 0.45, y: 0.53, alt: { x: 0.6, y: 0.53 } }
+            : { kind: 'result', x: 0.47, y: 0.94, keep: [0.3, 0.34, 0.38].map((x) => ({ x, y: 0.75 })) },
+        pointer: {
+          tap: async (x) => {
+            taps.push(`${x}`);
+            if (stage === 'result' && x === 0.47) stage = 'confirm';
+            else if (stage === 'confirm' && x === 0.45) stage = 'result';
+            else if (stage === 'confirm' && x === 0.6) stage = 'result';
+          },
+        },
+      },
+    );
+    for (; t < 120000; t += 250) bot.tick();
+    return { taps, won: store.v };
+  };
+
+  it('不知道打倒過 MVP（重新整理後）→ 被退回＝能帶 → 補上旗標、帶 3 件', () => {
+    const { taps, won } = run(false);
+    expect(won).toBe(true);
+    expect(taps.slice(0, 5)).toEqual(['0.47', '0.45', '0.3', '0.34', '0.38']);
+  });
+
+  it('3 件都點了還一直被退回（點沒生效）→ 退回 3 次後點仍要離開，不無限來回', () => {
+    const { taps } = run(true);
+    expect(taps.filter((x) => x === '0.45').length).toBeLessThanOrEqual(3);
+    expect(taps).toContain('0.6');
+  });
+});
+
 describe('倉庫已滿', () => {
   it('跳出替換視窗 → 點取消、不再帶；「不存放就離開？」點仍要離開', () => {
     let t = 0;
