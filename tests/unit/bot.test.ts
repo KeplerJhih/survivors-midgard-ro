@@ -195,10 +195,11 @@ describe('首領血條久不下降 → 依小地圖走向首領', () => {
     for (; t < 40000; t += 100) {
       bot.tick();
       held = bot.state.dirs;
-      p = {
-        x: p.x + ((held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0)) * 0.3,
-        y: p.y - ((held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0)) * 0.3,
-      };
+      // 斜向正規化（遊戲裡斜走不會比較快）
+      const hx = (held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0);
+      const hy = (held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0);
+      const hn = Math.hypot(hx, hy) || 1;
+      p = { x: p.x + (hx / hn) * 0.3, y: p.y - (hy / hn) * 0.3 };
     }
     expect(bot.state.activity).toBe('target');
     expect(bot.state.dirs).toEqual(['left']);
@@ -656,10 +657,11 @@ describe('祭壇', () => {
     for (; t < 20000; t += 100) {
       bot.tick();
       const held = bot.state.dirs;
-      p = {
-        x: p.x + ((held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0)) * 0.3,
-        y: p.y - ((held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0)) * 0.3,
-      };
+      // 斜向正規化（遊戲裡斜走不會比較快）
+      const hx = (held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0);
+      const hy = (held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0);
+      const hn = Math.hypot(hx, hy) || 1;
+      p = { x: p.x + (hx / hn) * 0.3, y: p.y - (hy / hn) * 0.3 };
       acts.push(bot.state.activity);
     }
     return { p, acts, bot };
@@ -708,10 +710,11 @@ describe('入口開著、畫面上找不到入口（暗色地圖）', () => {
       bot.tick();
       if (t === 24000) home = { ...p };
       const held = bot.state.dirs;
-      p = {
-        x: p.x + ((held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0)) * 0.3,
-        y: p.y - ((held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0)) * 0.3,
-      };
+      // 斜向正規化（遊戲裡斜走不會比較快）
+      const hx = (held.includes('right') ? 1 : 0) - (held.includes('left') ? 1 : 0);
+      const hy = (held.includes('up') ? 1 : 0) - (held.includes('down') ? 1 : 0);
+      const hn = Math.hypot(hx, hy) || 1;
+      p = { x: p.x + (hx / hn) * 0.3, y: p.y - (hy / hn) * 0.3 };
       if (t > 30000) maxAway = Math.max(maxAway, Math.hypot(p.x - home.x, p.y - home.y));
     }
     expect(bot.state.frozen).toBe(true);
@@ -1087,5 +1090,49 @@ describe('巢穴：時鐘剛停住首領就出現（載入後立刻開打）', (
     run(2000);
     expect(bot.state.activity).toBe('enter');
     expect(bot.state.dirs).toEqual(['up']);
+  });
+});
+
+describe('入口開著但畫面上認不出入口（淡色、被擋住）', () => {
+  it('回到入口剛開的位置後繞圈找，八個方向都會走到', () => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = false;
+    let p = { x: 100, y: 100 };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        readMinimap: () => ({ player: { ...p }, boss: null }),
+      },
+    );
+    // 角色依按住的方向移動（斜向正規化，與遊戲一致）
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) {
+        t += 250;
+        bot.tick();
+        const d = bot.state.dirs;
+        const dx = (d.includes('right') ? 1 : 0) - (d.includes('left') ? 1 : 0);
+        const dy = (d.includes('down') ? 1 : 0) - (d.includes('up') ? 1 : 0);
+        const n = Math.hypot(dx, dy) || 1;
+        p = { x: p.x + (dx / n) * 1.5, y: p.y + (dy / n) * 1.5 };
+      }
+    };
+    run(4000);
+    frozenClock = true; // 入口開了
+    const seen = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      run(250);
+      if (bot.state.activity === 'enter') seen.add(bot.state.dirs.join('+'));
+    }
+    expect(bot.state.enterSrc).toBe('circle');
+    expect(seen.size).toBeGreaterThanOrEqual(6);
   });
 });

@@ -1,7 +1,7 @@
 import type { Keyboard } from '../input/keyboard';
 import type { Pointer } from '../input/pointer';
 import type { Logger } from '../log';
-import type { Dir } from '../movement/directions';
+import { dirsFromAngle, type Dir } from '../movement/directions';
 import { circle, createStrategy, type Strategy } from '../movement/strategies';
 import type { BotConfig } from '../settings';
 import type { DangerProbes } from '../vision/danger';
@@ -112,6 +112,9 @@ const MINIMAP_MOVE_PX = 2;
 /** 祭壇：小地圖上離祭壇中心這麼近就站著等觸發；多久沒成功就放棄 */
 const ALTAR_ARRIVE = 0.09;
 const ALTAR_GIVE_UP_MS = 25000;
+/** 繞圈找入口：往外走多久、圓周每 1/8 走多久（入口開了會給 Sleipnir 加速） */
+const SEARCH_OUT_MS = 900;
+const SEARCH_SEG_MS = 600;
 const MINIMAP_STUCK_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
@@ -385,17 +388,51 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   /** 入口開著時的走向（記錄來源供除錯：指示器 / 畫面光 / 小地圖回入口位置） */
   const entryApproach = (t: number): Dir[] | null => {
     const p = sense.pointer.get(t);
-    if (p) return (state.enterSrc = 'pointer'), p;
+    if (p) return (searchStart = null), (state.enterSrc = 'pointer'), p;
     const g = sense.approach.get(t);
-    if (g) return (state.enterSrc = 'glow'), g;
+    if (g) return (searchStart = null), (state.enterSrc = 'glow'), g;
     const h = backToPortalHome();
-    state.enterSrc = h ? 'home' : '-';
-    return h;
+    if (h) {
+      searchStart = null;
+      return (state.enterSrc = 'home'), h;
+    }
+    if (!portalHome) return (state.enterSrc = '-'), null;
+    state.enterSrc = 'circle';
+    return circleSearch(t);
+  };
+
+  /**
+   * 已回到入口剛開時的位置、畫面上仍認不出入口（顏色淡、被柱子擋住）→ 繞圈找。
+   * 遊戲固定把入口開在當時角色位置 4～6.5 單位外、保證走得到（core/mvp_raid.gd _portal_point）
+   * → 先往外走一段再沿圓周繞，每圈半徑放大；與入口顏色無關，碰到入口就自動進入
+   */
+  let searchStart: number | null = null;
+  const circleSearch = (t: number): Dir[] => {
+    if (searchStart === null) searchStart = t;
+    let e = t - searchStart;
+    for (let loop = 0; ; loop++) {
+      const k = 1 + 0.35 * (loop % 4);
+      const out = SEARCH_OUT_MS * k, seg = SEARCH_SEG_MS * k;
+      const total = out + 8 * seg + out;
+      if (e >= total) {
+        e -= total;
+        continue;
+      }
+      const start = (loop * 3) % 8; // 每圈換起點方向
+      if (e < out) return dirsFromAngle((start * Math.PI) / 4);
+      if (e < out + 8 * seg) {
+        const i = Math.floor((e - out) / seg);
+        // 沿圓周（逆時針，八角形）：第 i 段的切線方向＝起點方向 + 90° + i·45°
+        return dirsFromAngle(((start + i) * Math.PI) / 4 + Math.PI / 2);
+      }
+      return dirsFromAngle((start * Math.PI) / 4 + Math.PI); // 回中心
+    }
   };
 
   const backToPortalHome = (): Dir[] | null => {
     if (!portalHome || !mmLast) return null;
-    return navigator.steer(mmLast.player, portalHome, 4);
+    // 繞圈找入口時會離開中心一段距離 → 放寬，走太遠（被牆帶偏）才拉回中心重來
+    return navigator.steer(mmLast.player, portalHome, searchStart === null ? 4 : 12);
   };
 
   /**
