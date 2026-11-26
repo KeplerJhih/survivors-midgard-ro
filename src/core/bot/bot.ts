@@ -117,6 +117,8 @@ const ALTAR_GIVE_UP_MS = 25000;
 /** 繞圈找入口：往外走多久、圓周每 1/8 走多久（入口開了會給 Sleipnir 加速） */
 const SEARCH_OUT_MS = 900;
 const SEARCH_SEG_MS = 600;
+/** 入口指示圓盤短暫消失時沿最後方向走多久 */
+const POINTER_COAST_MS = 3000;
 const MINIMAP_STUCK_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
@@ -390,7 +392,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   /** 入口在畫面外又沒有指示器（暗色地圖指示圓盤與地形連成一片）→ 依小地圖走回入口剛開時的位置，入口就會回到畫面上 */
   /** 入口開著時的走向（記錄來源供除錯：指示器 / 畫面光 / 小地圖回入口位置） */
   const entryApproach = (t: number): Dir[] | null => {
+    // 指示圓盤會閃（被特效、樹影蓋住一兩筆）→ 3 秒內沿最後方向走，不馬上改成回入口位置 / 繞圈（實機：兩者交替來回）
     const p = sense.pointer.get(t);
+    if (p) lastPointer = { dirs: p, at: t };
+    else if (lastPointer && t - lastPointer.at < POINTER_COAST_MS) return (state.enterSrc = 'pointer~'), lastPointer.dirs;
     if (p) return (searchStart = null), (state.enterSrc = 'pointer'), p;
     const g = sense.approach.get(t);
     if (g) return (searchStart = null), (state.enterSrc = 'glow'), g;
@@ -410,6 +415,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
    * → 先往外走一段再沿圓周繞，每圈半徑放大；與入口顏色無關，碰到入口就自動進入
    */
   let searchStart: number | null = null;
+  let lastPointer: { dirs: Dir[]; at: number } | null = null;
   const circleSearch = (t: number): Dir[] => {
     if (searchStart === null) searchStart = t;
     let e = t - searchStart;
@@ -611,7 +617,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const portal = sense.portal.get(t);
       const frozen = sense.frozen.get(t);
       state.frozen = frozen;
-      if (frozen && !wasFrozen && !mvpFight) portalHome = mmLast && t - mmSeenAt < 1500 ? { ...mmLast.player } : null;
+      // 入口開啟位置：只有「看著時鐘停下」才知道（重新載入外掛時入口早就開了，當下位置不是入口開啟處）
+      if (frozen && !wasFrozen && !mvpFight)
+        portalHome = clock.sawTick && mmLast && t - mmSeenAt < 1500 ? { ...mmLast.player } : null;
       if (!frozen) portalHome = null;
       wasFrozen = frozen;
       // 時間停住期間打過首領＝在 MVP 巢穴裡（入口開著時一般怪物會被清掉，不會有首領）→ 勝利後找淡藍出口。

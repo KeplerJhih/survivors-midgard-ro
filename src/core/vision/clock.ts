@@ -30,6 +30,8 @@ export interface FreezeDetector {
   readonly ticking: boolean;
   /** 最後一次確認時鐘走動的時間 */
   readonly changedAt: number;
+  /** 看過時鐘走動（停住是「看著它停下」的，不是一開始就停著） */
+  readonly sawTick: boolean;
 }
 
 /** 字形連續 freezeMs 不變 → 停住。必須先看過它走動（開局就停住不判定）；偶爾讀不到（方框被遮）沿用上次狀態 */
@@ -52,6 +54,9 @@ export function createFreezeDetector(freezeMs = 3000): FreezeDetector {
     },
     get changedAt() {
       return changedAt;
+    },
+    get sawTick() {
+      return ticked;
     },
     update(glyph, now) {
       nowT = now;

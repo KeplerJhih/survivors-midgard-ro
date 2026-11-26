@@ -1136,3 +1136,63 @@ describe('入口開著但畫面上認不出入口（淡色、被擋住）', () =
     expect(seen.size).toBeGreaterThanOrEqual(6);
   });
 });
+
+describe('入口指示圓盤 / 重新載入', () => {
+  const mk = (opts: { ticksFirst: boolean; pointer: () => boolean }) => {
+    let t = 0;
+    let digit = 0;
+    let frozenClock = !opts.ticksFirst;
+    let p = { x: 100, y: 100 };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
+    const big = { kind: 'target' as const, x: 0, y: -0.4, icon: [230, 170, 200] as [number, number, number], size: 0.067 };
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        clockGlyph: () => {
+          if (!frozenClock) digit++;
+          return glyph();
+        },
+        findIndicators: () => (opts.pointer() ? [big] : []),
+        readMinimap: () => ({ player: { ...p }, boss: null }),
+      },
+    );
+    const run = (ms: number) => {
+      for (let e = 0; e < ms; e += 250) {
+        t += 250;
+        bot.tick();
+        const d = bot.state.dirs;
+        const dx = (d.includes('right') ? 1 : 0) - (d.includes('left') ? 1 : 0);
+        const dy = (d.includes('down') ? 1 : 0) - (d.includes('up') ? 1 : 0);
+        p = { x: p.x + dx, y: p.y + dy };
+      }
+    };
+    return { bot, run, freeze: () => (frozenClock = true), now: () => t };
+  };
+
+  it('指示圓盤時有時無：短暫消失時沿最後方向（往上）走，不改成繞圈', () => {
+    let tick = 0;
+    const { bot, run, freeze } = mk({ ticksFirst: true, pointer: () => frozen && tick++ % 4 !== 0 });
+    let frozen = false;
+    run(4000);
+    freeze();
+    frozen = true;
+    run(6000);
+    const srcs = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      run(250);
+      srcs.add(bot.state.enterSrc);
+      expect(bot.state.dirs).toContain('up');
+    }
+    expect(srcs.has('circle')).toBe(false);
+  });
+
+  it('外掛載入時時鐘就停著（入口早已開啟）：不把當下位置當入口開啟處、不繞圈', () => {
+    const { bot, run } = mk({ ticksFirst: false, pointer: () => false });
+    run(20000);
+    expect(bot.state.frozen).toBe(true);
+    expect(bot.state.enterSrc).not.toBe('circle');
+  });
+});
