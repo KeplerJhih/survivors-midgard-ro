@@ -283,11 +283,13 @@ function decideCore(
   // 小卡格（被催眠「等級要轉給誰？」：一個大面板裡 ≥5 張等寬小卡、沒有按鈕）→ 點左上第一張
   const tile = tileGrid(regions);
   if (tile) return tap('modal', tile);
-  // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
-  if (frag) return tap('modal', frag);
-  // 最後手段：置中大視窗內、底部的「焦點框」按鈕（Godot 預設焦點的藍框，通常是主要動作）
+  // 置中大視窗內、底部的「焦點框」按鈕（Godot 預設焦點的藍框＝主要動作）優先於按鈕殘片：
+  // 實機 MVP 寶箱視窗「全部販賣 (F)」「繼續 (Enter)」→ 殘片只切得出左邊的販賣鈕 → 每次都把寶箱裝備賣掉，
+  // 賣完按鈕變灰還一直點它而卡住（ui/menus.gd：ok.grab_focus，繼續有藍框）
   const focus = focusedButton(f, regions);
   if (focus) return { kind: 'modal', ...focus };
+  // 置中的視窗裡切不出按鈕（小按鈕被文字切碎）：點面板底部中線附近的小亮塊（按鈕殘片）
+  if (frag) return tap('modal', frag);
   return null;
 }
 
@@ -338,7 +340,8 @@ function focusedButton(f: Frame, regions: Region[]): { x: number; y: number } | 
     const perimeter = 2 * (mxx - mnx + mxy - mny + 2);
     if (w < 0.02 || w > 0.25 || h < 0.015 || h > 0.1 || n < perimeter * 0.3) continue;
     const c = { x: (mnx + mxx + 1) / 2 / W, y: (mny + mxy + 1) / 2 / H };
-    if (!best || c.y > best.y) best = c;
+    // 取最下面一排；同一排有好幾個藍框時取最右邊（遊戲對話框的主要動作放最後，如寶箱「繼續」在「全部販賣」右邊）
+    if (!best || c.y > best.y + 0.02 || (Math.abs(c.y - best.y) <= 0.02 && c.x > best.x)) best = c;
   }
   return best;
 }
