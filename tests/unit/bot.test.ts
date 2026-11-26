@@ -1196,6 +1196,32 @@ describe('帶回物品：結算頁進場動畫', () => {
   });
 });
 
+describe('帶回物品：某些取樣格數變少', () => {
+  it('切出的格數時多時少（2 排物品）→ 不因某張只切出 1 格就當成帶完、直接點再玩一次', () => {
+    let t = 0;
+    let n = 0;
+    const taps: string[] = [];
+    const store = { v: true };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const full = [0.1, 0.15, 0.2, 0.25, 0.3].map((x) => ({ x, y: 0.75 }));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () => {
+          n++;
+          return { kind: 'result', x: 0.47, y: 0.94, keep: n > 4 && n % 2 === 0 ? full.slice(0, 1) : full };
+        },
+        pointer: { tap: async (x) => void taps.push(`${x}`) },
+      },
+    );
+    for (; t < 30000; t += 250) bot.tick();
+    expect(taps.slice(0, 4)).toEqual(['0.1', '0.15', '0.2', '0.47']);
+  });
+});
+
 describe('一般走位撞牆', () => {
   it('按著方向鍵小地圖位置 2 秒沒動 → 轉 90° 繞路', () => {
     let t = 0;
@@ -1606,6 +1632,7 @@ describe('入口在畫面上：看名稱', () => {
 describe('破關帶回：外掛重新載入後仍記得打倒過 MVP', () => {
   it('wonMvp.get() 為 true → 結算頁先帶物品再點再玩一次', () => {
     let t = 0;
+    let inRun = false;
     const taps: string[] = [];
     const store = { v: true };
     const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
@@ -1615,12 +1642,17 @@ describe('破關帶回：外掛重新載入後仍記得打倒過 MVP', () => {
         keyboard,
         now: () => t,
         wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
-        detectScreen: () => ({ kind: 'result', x: 0.47, y: 0.94, keep: [{ x: 0.3, y: 0.8 }, { x: 0.34, y: 0.8 }, { x: 0.38, y: 0.8 }], keepTabs: [] }),
+        readHp: () => (inRun ? { fill: 20, low: false } : null),
+        detectScreen: () => (inRun ? null : { kind: 'result', x: 0.47, y: 0.94, keep: [{ x: 0.3, y: 0.8 }, { x: 0.34, y: 0.8 }, { x: 0.38, y: 0.8 }], keepTabs: [] }),
         pointer: { tap: async (x) => void taps.push(`${x}`) },
       },
     );
     for (let e = 0; e < 20000; e += 250) (t += 250), bot.tick();
     expect(taps.slice(0, 4)).toEqual(['0.3', '0.34', '0.38', '0.47']);
-    expect(store.v).toBe(false); // 點了再玩一次 → 清掉
+    // 點了再玩一次但還在結算頁（「不存放就離開？」退回）→ 不清掉，下一局 HP 條出現才清
+    expect(store.v).toBe(true);
+    inRun = true;
+    for (let e = 0; e < 3000; e += 250) (t += 250), bot.tick();
+    expect(store.v).toBe(false);
   });
 });

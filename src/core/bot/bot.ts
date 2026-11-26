@@ -186,8 +186,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let keepTaken = 0;
   /** 目前分頁（以按下的分頁 x 位置識別）、這頁點了幾格、試過切到哪些分頁 */
   let keepPageTaps = 0;
-  let lastKeepLen = -1;
   let keepWaits = 0;
+  let keepMaxLen = 0;
+  let keepShortWaits = 0;
+  let resultLeftPending = false;
   const keepTabTried = new Set<number>();
   const nextKeep = (act: ScreenAction): { x: number; y: number; what: string } | null => {
     const tabs = act.keepTabs ?? [];
@@ -282,6 +284,17 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         // 遲滯：低於門檻進入撤退，回到門檻 +0.2 才解除（實機：無盡模式後期 HP 0.5 → 0 只要 2~3 秒，
         // 門檻 0.35 進撤退時已來不及）；讀不到時沿用
         if (hp) hpSeenAt = now();
+        // 結算頁之後又看到 HP 條＝新的一局開始 → 重設「打倒過 MVP」與帶回物品進度
+        if (hp && resultLeftPending) {
+          resultLeftPending = false;
+          setWon(false);
+          keepTaken = 0;
+          keepPageTaps = 0;
+          keepMaxLen = 0;
+          keepShortWaits = 0;
+          keepWaits = 0;
+          keepTabTried.clear();
+        }
         // 讀不到時沿用，但最多 5 秒（實機：HP 列學錯後一直讀不到，卡在撤退）
         let nowLow =
           hp === null
@@ -562,12 +575,18 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       // 結算頁剛出現時物品格還在進場動畫：同一位置先只切出 1 格（實機第一下點在 0.55,0.80，之後才是 12~17 格那排）
       // → 要帶物品時，格數連續兩次取樣相同才開始點
       const keepLen = act?.kind === 'result' ? act.keep?.length ?? 0 : -1;
-      // 格數一直跳（切割不穩）時最多等 4 次，不卡在結算頁
-      const keepUnsettled =
-        act?.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE && keepLen !== lastKeepLen && keepWaits < 4;
-      if (act) {
-        keepWaits = keepUnsettled ? keepWaits + 1 : 0;
-        lastKeepLen = keepLen;
+      // 帶物品時兩種情況先不點：
+      // ① 格數比之前看過的都多（進場動畫還在長，實機第一下只切出 1 格、位置不對）→ 等下一張
+      // ② 格數比之前看過的少（2 排物品時某些取樣只切出 1 格 → 以為帶完、直接點再玩一次）→ 等完整的那張
+      // 各有上限，不卡在結算頁
+      const keepPending = act?.kind === 'result' && wonMvpThisRun && keepTaken < KEEP_FREE;
+      const keepGrew = keepPending && keepLen > keepMaxLen;
+      const keepShort = keepPending && keepLen < keepMaxLen;
+      const keepUnsettled = (keepGrew && keepWaits < 4) || (keepShort && keepShortWaits < 20);
+      if (act?.kind === 'result') {
+        if (keepGrew) keepWaits++;
+        if (keepShort) keepShortWaits++;
+        keepMaxLen = Math.max(keepMaxLen, keepLen);
       }
       if (act && pointer && !keepUnsettled) {
         state.screenTaps++;
@@ -613,12 +632,10 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         } else {
           log?.info('screen: 點擊', act);
           void pointer.tap(act.x, act.y);
-          if (act.kind === 'result') {
-            setWon(false); // 離開結算頁＝下一局重新計
-            keepTaken = 0;
-            keepPageTaps = 0;
-            keepTabTried.clear();
-          }
+          // 點了結算頁的按鈕不代表離開：沒帶滿 3 件會跳「不存放就離開？」、Enter 退回結算頁
+          // （實機：在這裡就清掉「打倒過 MVP」→ 剩下 2 件不再帶、一直點再玩一次原地打轉）
+          // → 等下一局 HP 條出現才重設（見 vitals）
+          if (act.kind === 'result') resultLeftPending = true;
         }
         // 初始技能選完＝新的一局開始；「隨機選擇」每局會被遊戲重設 → 重新同步。
         // 升級三張普通卡也會被判成初始技能 → 限制頻率，避免對局中一直開暫停選單
