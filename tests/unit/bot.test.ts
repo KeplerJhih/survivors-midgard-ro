@@ -1204,6 +1204,7 @@ describe('出巢穴回原地圖', () => {
     let frozenClock = false;
     let bar = 0;
     let p = { x: 40, y: 40 };
+    let mmVisible = true;
     const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
     const glyph = () => Uint8Array.from({ length: 300 }, (_, i) => ((i * 7 + digit * 13) % 5 === 0 ? 1 : 0));
     const bot = createBot(
@@ -1217,7 +1218,7 @@ describe('出巢穴回原地圖', () => {
         },
         bossBar: () => bar,
         approachExit: () => ['up'],
-        readMinimap: () => ({ player: { ...p }, boss: null }),
+        readMinimap: () => (mmVisible ? { player: { ...p }, boss: null } : null),
       },
     );
     const run = (ms: number) => {
@@ -1231,9 +1232,13 @@ describe('出巢穴回原地圖', () => {
     bar = 0;
     run(6000);
     expect(bot.state.activity).toBe('enter'); // 巢穴內找出口
-    // 走進出口 → 回到原地圖（小地圖位置跳到別處、時鐘恢復）
+    // 走進出口 → 勝利選擇視窗（小地圖讀不到幾秒）→ 回到原地圖（小地圖位置跳到別處、時鐘恢復）
+    mmVisible = false;
+    run(4000);
     p = { x: 90, y: 20 };
     frozenClock = false;
+    run(2000);
+    mmVisible = true;
     run(3000);
     // 原地圖的首領血條斷斷續續出現（不是巢穴：時鐘在走）
     for (let i = 0; i < 6; i++) {

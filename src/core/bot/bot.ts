@@ -317,7 +317,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         navigator.observe(m.player, state.dirs, now());
         // 小地圖上角色位置瞬間跳很遠＝換地圖（傳送）。打倒 MVP 後跳走＝已出巢穴回到原地圖 → 不再找出口
         // （實機：原地圖有首領血條一直出現，「首領消失 30 秒」條件遲遲不成立，回地圖後還追著指示器 2~3 分鐘不打怪）
-        if (mmLast && now() - mmSeenAt < 1500 && mvpFight && now() - lastBossAt > 3000 &&
+        // 出口後跳出勝利選擇視窗 → 小地圖中斷一段時間（實機：回地圖後又找了 70 秒出口）；
+        // 中斷較久時要時鐘已恢復（不在巢穴）才算，避免巢穴裡讀數中斷又走了一段被當成換地圖
+        if (mmLast && (now() - mmSeenAt < 1500 || !state.frozen) && mvpFight && now() - lastBossAt > 3000 &&
           Math.hypot(m.player.x - mmLast.player.x, m.player.y - mmLast.player.y) > MAP_JUMP_PX) {
           mvpFight = false;
           lairDialog = false;
