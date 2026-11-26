@@ -298,6 +298,25 @@ describe('MVP 巢穴：勝利後走淡藍出口，不走金色因果路線', () 
 describe('視窗辨識失敗的備援（與畫面大小無關）', () => {
   const frame = (v: number) => ({ width: 4, height: 4, data: new Uint8ClampedArray(64).fill(v) });
 
+  it('城鎮：HP 條 60 秒以上讀不到 → 不點「視窗」（Prontera 石板地被當成結算頁，點到扭蛋機旁）', () => {
+    let t = 0;
+    const taps: [number, number][] = [];
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        readHp: () => null,
+        detectScreen: () => ({ kind: 'result', x: 0.2, y: 0.91 }),
+        pointer: { tap: async (x, y) => void taps.push([x, y]) },
+      },
+    );
+    for (t = 60000; t < 70000; t += 250) bot.tick();
+    expect(taps).toEqual([]);
+    expect(bot.state.activity).not.toBe('screen');
+  });
+
   it('同一個視窗點 3 次還在 → 與點擊交替按 Enter', async () => {
     let t = 0;
     const order: string[] = [];

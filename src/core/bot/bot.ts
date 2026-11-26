@@ -128,6 +128,8 @@ const POINTER_COAST_MS = 3000;
 const MINIMAP_STUCK_MS = 2000;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
+/** HP 條連續這麼久讀不到＝不在對局（城鎮）→ 不辨識視窗。結算→選地圖→初始技能一路都在 60 秒內 */
+const TOWN_NO_HUD_MS = 60000;
 /** 同一個視窗點了幾次還在 → 改成與點擊交替按 Enter */
 const TAPS_BEFORE_ENTER = 3;
 /** 破關時免費帶回倉庫的件數（game_data.gd KEEP_WIN） */
@@ -528,7 +530,9 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const gameRunning = clock.ticking && t - clock.changedAt < GAME_RUNNING_MS;
       const rawSeen = deps.gameSync?.busy ? null : sense.screen.get(t);
       if (rawSeen) lastWindowAt = t;
-      const seen = gameRunning ? null : rawSeen;
+      // 城鎮：沒有 HP 條、時鐘也不走 → 明亮石板地會被當成結算頁 / 視窗，點到扭蛋機、NPC（實機 Prontera）
+      const hudGone = t - Math.max(hpSeenAt, startedAt) >= TOWN_NO_HUD_MS;
+      const seen = gameRunning || hudGone ? null : rawSeen;
       // 只有新的取樣才交給處理器（它要求「連續 2 次獨立取樣」成立才點，避免同一份快取被重複計數）
       const act = sense.screen.fresh && !deps.gameSync?.busy ? screens.update(seen, t) : null;
       if (act && pointer) {
