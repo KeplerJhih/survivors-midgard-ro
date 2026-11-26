@@ -126,6 +126,8 @@ const SEARCH_SEG_MS = 600;
 /** 入口指示圓盤短暫消失時沿最後方向走多久 */
 const POINTER_COAST_MS = 3000;
 const MINIMAP_STUCK_MS = 2000;
+/** 小地圖相鄰兩次讀數距離超過這麼多 px＝換地圖（走路每 0.4 秒只移動幾 px） */
+const MAP_JUMP_PX = 15;
 /** 備援 Enter 的最短間隔 */
 const ENTER_COOLDOWN = 3000;
 /** HP 條與小地圖連續這麼久都讀不到＝不在對局（城鎮）→ 不辨識視窗。結算→選地圖→初始技能一路都在 60 秒內 */
@@ -313,6 +315,14 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
         const m = deps.readMinimap?.() ?? null;
         if (!m) return null;
         navigator.observe(m.player, state.dirs, now());
+        // 小地圖上角色位置瞬間跳很遠＝換地圖（傳送）。打倒 MVP 後跳走＝已出巢穴回到原地圖 → 不再找出口
+        // （實機：原地圖有首領血條一直出現，「首領消失 30 秒」條件遲遲不成立，回地圖後還追著指示器 2~3 分鐘不打怪）
+        if (mmLast && now() - mmSeenAt < 1500 && mvpFight && now() - lastBossAt > 3000 &&
+          Math.hypot(m.player.x - mmLast.player.x, m.player.y - mmLast.player.y) > MAP_JUMP_PX) {
+          mvpFight = false;
+          lairDialog = false;
+          log?.info('minimap: 位置跳動＝已離開巢穴，停止找出口');
+        }
         mmSeenAt = now();
         mmLast = m;
         state.altars = (m.altars ?? []).map((a) => a.id);
