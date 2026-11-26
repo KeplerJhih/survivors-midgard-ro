@@ -191,6 +191,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
   let keepWaits = 0;
   let keepMaxLen = 0;
   let keepShortWaits = 0;
+  let keepFewWaits = 0;
+  const keepTappedX: number[] = [];
   let resultFirstAt: number | null = null;
   let resultLeftPending = false;
   const keepTabTried = new Set<number>();
@@ -199,8 +201,11 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     const cur = tabs.find((t) => t.pressed);
     // 只有自己點了分頁才從第 1 格重算：「按下」的分頁靠亮度差判斷，取樣間會閃 → 原本一閃就重算，
     // 同一格被點 3 次（存 → 取消 → 存），只帶回 1 件（實機）
-    const tile = act.keep?.[keepPageTaps];
+    // 依位置挑：最左邊、還沒點過的那格（不依索引：某張取樣只切出部分格子時，索引會對到別格；
+    // 實機第一下點到第 7 格、之後再點第 2、3 格，評分最高的第 1 格沒帶）
+    const tile = act.keep?.find((k) => !keepTappedX.some((x) => Math.abs(x - k.x) < 0.015));
     if (tile) {
+      keepTappedX.push(tile.x);
       keepPageTaps++;
       keepTaken++;
       return { ...tile, what: 'item' };
@@ -211,6 +216,7 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
     if (!next || keepTabTried.has(Math.round(next.x * 100))) return null;
     keepTabTried.add(Math.round(next.x * 100));
     keepPageTaps = 0;
+    keepTappedX.length = 0;
     return { x: next.x, y: next.y, what: 'tab' };
   };
   let detourUntil = -Infinity;
@@ -297,6 +303,8 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
           keepShortWaits = 0;
           keepWaits = 0;
           resultFirstAt = null;
+          keepFewWaits = 0;
+          keepTappedX.length = 0;
           keepTabTried.clear();
         }
         // 讀不到時沿用，但最多 5 秒（實機：HP 列學錯後一直讀不到，卡在撤退）
@@ -589,10 +597,13 @@ export function createBot(cfg: BotConfig, deps: BotDeps): Bot {
       const keepEarly = keepPending && resultFirstAt !== null && t - resultFirstAt < RESULT_SETTLE_MS;
       const keepGrew = keepPending && keepLen > keepMaxLen;
       const keepShort = keepPending && keepLen < keepMaxLen;
-      const keepUnsettled = keepEarly || (keepGrew && keepWaits < 4) || (keepShort && keepShortWaits < 20);
+      // ④ 切出的格數少於還要帶的件數 → 多半是切割不完整，等一下（真的只有 1~2 件時最多等 3 次）
+      const keepFew = keepPending && keepLen < KEEP_FREE - keepTaken && keepFewWaits < 3;
+      const keepUnsettled = keepEarly || keepFew || (keepGrew && keepWaits < 4) || (keepShort && keepShortWaits < 20);
       if (act?.kind === 'result') {
         if (keepGrew) keepWaits++;
         if (keepShort) keepShortWaits++;
+        if (keepFew) keepFewWaits++;
         keepMaxLen = Math.max(keepMaxLen, keepLen);
       }
       if (act && pointer && !keepUnsettled) {

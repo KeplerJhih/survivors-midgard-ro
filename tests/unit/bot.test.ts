@@ -1127,7 +1127,7 @@ describe('破關帶回：最高分頁不足 3 件', () => {
     bar = 0;
     run(8000);
     result = true;
-    run(20000);
+    run(40000); // 帶物品前會等畫面穩定（進場動畫、格數不足）
     expect(taps.slice(0, 5)).toEqual(['0.2', '0.5', '0.3', '0.34', '0.47']);
   });
 });
@@ -1241,6 +1241,33 @@ describe('帶回物品：結算頁出現後先等', () => {
     for (t = 1000; t < 20000; t += 250) bot.tick();
     expect(taps.length).toBeGreaterThan(0);
     expect(taps[0]! - 1000).toBeGreaterThanOrEqual(2500);
+  });
+});
+
+describe('帶回物品：依位置挑最左邊沒點過的格子', () => {
+  it('某張取樣只切出右邊幾格 → 不照索引點，等切到夠多格再從最左邊開始', () => {
+    let t = 0;
+    let n = 0;
+    const taps: string[] = [];
+    const store = { v: true };
+    const keyboard = createKeyboard(new EventTarget(), { sleep: async () => {} });
+    const full = [0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45].map((x) => ({ x, y: 0.76 }));
+    const bot = createBot(
+      { ...DEFAULT_SETTINGS.bot, enabled: true },
+      {
+        keyboard,
+        now: () => t,
+        wonMvp: { get: () => store.v, set: (v) => void (store.v = v) },
+        detectScreen: () => {
+          n++;
+          // 前段只切出 2 格（右邊的），之後才完整
+          return { kind: 'result', x: 0.47, y: 0.94, keep: n < 12 ? full.slice(5) : full };
+        },
+        pointer: { tap: async (x) => void taps.push(`${x}`) },
+      },
+    );
+    for (; t < 40000; t += 250) bot.tick();
+    expect(taps.slice(0, 3)).toEqual(['0.15', '0.2', '0.25']);
   });
 });
 
